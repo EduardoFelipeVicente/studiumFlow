@@ -1,0 +1,29 @@
+name: studyflow
+description: "Aplicativo para organização de estudos!"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  syncfusion_flutter_calendar: ^30.2.7
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.1
+  cloud_firestore: 6.0.0
+  google_sign_in: ^6.0.0
+  googleapis: ^11.0.0
+  googleapis_auth: ^1.4.0
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  url_launcher: ^6.1.10
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
