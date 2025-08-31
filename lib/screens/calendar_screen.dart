@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
+import 'package:studyflow/screens/components/side_menu.dart';
+import 'package:studyflow/services/google_calendar_service.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -12,27 +14,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
   CalendarView _currentView = CalendarView.month;
   DateTime _focusedDay = DateTime.now();
   bool _showAgenda = false;
+  bool _isLoading = true;
 
-  final List<Appointment> _appointments = [
-    Appointment(
-      startTime: DateTime.now().add(const Duration(hours: 2)),
-      endTime: DateTime.now().add(const Duration(hours: 3)),
-      subject: 'Sessão de Matemática',
-      color: Colors.deepPurple,
-    ),
-    Appointment(
-      startTime: DateTime.now().add(const Duration(days: 1, hours: 1)),
-      endTime: DateTime.now().add(const Duration(days: 1, hours: 2)),
-      subject: 'Revisão de História',
-      color: Colors.orange,
-    ),
-    Appointment(
-      startTime: DateTime.now().add(const Duration(days: 2, hours: 1)),
-      endTime: DateTime.now().add(const Duration(days: 2, hours: 2)),
-      subject: 'Leitura de Filosofia',
-      color: Colors.green,
-    ),
-  ];
+  List<Appointment> _appointments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppointments();
+  }
+
+  Future<void> _loadAppointments() async {
+    final service = GoogleCalendarService();
+    final events = await service.fetchAppointments();
+
+    setState(() {
+      _appointments = events;
+      _isLoading = false;
+    });
+  }
 
   void _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -52,26 +52,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _goToPreviousMonth() {
     setState(() {
-      _focusedDay = DateTime(
-        _focusedDay.year,
-        _focusedDay.month - 1,
-        1,
-      );
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
     });
   }
 
   void _goToNextMonth() {
     setState(() {
-      _focusedDay = DateTime(
-        _focusedDay.year,
-        _focusedDay.month + 1,
-        1,
-      );
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Calendário de Estudos')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Calendário de Estudos'),
@@ -121,6 +121,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ],
       ),
+      drawer: const SideMenu(),
       body: _showAgenda ? _buildAgendaView() : _buildCalendarView(),
     );
   }
@@ -170,4 +171,3 @@ class MeetingDataSource extends CalendarDataSource {
     appointments = source;
   }
 }
-

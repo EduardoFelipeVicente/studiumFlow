@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:studyflow/services/auth_service.dart';
+import 'package:studyflow/screens/components/side_menu.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -14,6 +15,7 @@ class SettingsScreen extends StatelessWidget {
         title: const Text('Configurações'),
         backgroundColor: Colors.deepPurple,
       ),
+      drawer: const SideMenu(), // ✅ Adicionado menu lateral
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
