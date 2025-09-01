@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:studyflow/screens/welcome_screen.dart';
 import 'package:studyflow/screens/home_screen.dart';
+import 'package:studyflow/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,99 +13,53 @@ class LoginScreen extends StatefulWidget {
 class LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final authService = AuthService();
 
   Future<void> loginWithEmail() async {
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } catch (e) {
-      debugPrint('Erro: $e');
+    final email = emailController.text.trim();
+    final senha = passwordController.text.trim();
+
+    final user = await authService.signInWithEmail(email, senha);
+    if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Erro ao fazer login com email')),
       );
+      return;
     }
+
+    await authService.criarOuAtualizarUsuario(user);
+    final primeiroLogin = await authService.isPrimeiroLogin(user);
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => primeiroLogin
+            ? WelcomeScreen(user: user)
+            : const HomeScreen(),
+      ),
+    );
   }
 
   Future<void> loginWithGoogle() async {
-    final googleSignIn = GoogleSignIn(
-      scopes: ['email'],
-      // Adicione seu client ID para Web aqui se necessário:
-      // serverClientId: 'SEU_CLIENT_ID_WEB.apps.googleusercontent.com',
-    );
-
-    // Garante que não há sessão ativa
-    final isSignedIn = await googleSignIn.isSignedIn();
-    if (isSignedIn) {
-      await googleSignIn.signOut();
-    }
-
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-    
-    if (googleUser == null) return;
-
-    final googleAuth = await googleUser.authentication;
-
-    if (googleAuth.idToken == null || googleAuth.accessToken == null) {
+    final user = await authService.signInWithGoogle();
+    if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Erro ao autenticar com Google')),
       );
       return;
     }
 
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken!,
-      idToken: googleAuth.idToken!,
+    await authService.criarOuAtualizarUsuario(user);
+    final primeiroLogin = await authService.isPrimeiroLogin(user);
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => primeiroLogin
+            ? WelcomeScreen(user: user)
+            : const HomeScreen(),
+      ),
     );
-
-    await FirebaseAuth.instance.signInWithCredential(credential);
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final docRef = FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(user.uid);
-    final doc = await docRef.get();
-
-    if (!mounted) return;
-
-    if (!doc.exists) {
-      await docRef.set({
-        'nome': user.displayName,
-        'email': user.email,
-        'primeiroLogin': true,
-        'loginManual': true,
-      });
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => WelcomeScreen(user: user)),
-      );
-    } else {
-      await docRef.update({'loginManual': true});
-
-      final dados = doc.data() as Map<String, dynamic>;
-      final primeiroLogin = dados['primeiroLogin'] ?? false;
-
-      if (primeiroLogin) {
-        await docRef.update({'primeiroLogin': false, 'loginManual': false});
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => WelcomeScreen(user: user)),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
-    }
   }
 
   @override
