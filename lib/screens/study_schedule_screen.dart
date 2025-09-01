@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/services/google_calendar_service.dart';
+import 'package:studyflow/services/auth_service.dart';
 
 class StudyScheduleChart extends StatefulWidget {
   const StudyScheduleChart({super.key});
@@ -319,8 +320,23 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () async {
-                      final calendarService = GoogleCalendarService();
+                      // 1) Pega o token do Google já autenticado pelo AuthService
+                      final token = await AuthService().getGoogleAccessToken();
+                      if (token == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Não foi possível obter token do Google',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
 
+                      // 2) Cria instância do CalendarService com o token
+                      final calendarService = GoogleCalendarService(token);
+
+                      // 3) Insere todas as sessões no Google Calendar
                       for (int i = 0; i < _sessoesGeradas.length; i++) {
                         final inicio = _sessoesGeradas[i];
                         final focoMinutos = _duracoesFoco[i];
@@ -354,17 +370,14 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                         ),
                       );
                     },
-
-                    icon: const Icon(Icons.save, color: Colors.white),
-                    label: const Text(
-                      'Salvar Secoes',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    icon: const Icon(Icons.calendar_today),
+                    label: const Text('Salvar no Google Calendar'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepPurple,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ],

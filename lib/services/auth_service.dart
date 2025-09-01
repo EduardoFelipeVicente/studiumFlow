@@ -1,51 +1,63 @@
+// lib/services/auth_service.dart
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:googleapis/calendar/v3.dart' as calendar;
 
 class AuthService {
-  final _auth = FirebaseAuth.instance;
-  final _googleSignIn = GoogleSignIn();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  /// GoogleSignIn configurado com Web Client ID e escopos de Email + Calendar
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '109345613312-c399mids3ek6gd4v2vpe2cr2se34mec5.apps.googleusercontent.com',
+    scopes: [
+      'email',
+      calendar.CalendarApi.calendarScope,
+    ],
+  );
+
+  /// Login com Google e retorno do usuário Firebase
   Future<User?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
+      final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
-      return userCredential.user;
+      final userCred = await _auth.signInWithCredential(credential);
+      return userCred.user;
     } catch (e) {
       print('Erro ao fazer login com Google: $e');
       return null;
     }
   }
 
+  /// Login com email/senha e retorno do usuário Firebase
   Future<User?> signInWithEmail(String email, String senha) async {
     try {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final cred = await _auth.signInWithEmailAndPassword(
         email: email,
         password: senha,
       );
-      return credential.user;
+      return cred.user;
     } catch (e) {
       print('Erro ao fazer login com email: $e');
       return null;
     }
   }
 
+  /// Cria ou atualiza documento do usuário no Firestore
   Future<void> criarOuAtualizarUsuario(User user) async {
     final docRef = FirebaseFirestore.instance
         .collection('usuarios')
         .doc(user.uid);
-    final doc = await docRef.get();
 
+    final doc = await docRef.get();
     if (!doc.exists) {
       await docRef.set({
         'nome': user.displayName,
@@ -58,28 +70,29 @@ class AuthService {
     }
   }
 
+  /// Retorna true se for o primeiro login (e já atualiza flags no Firestore)
   Future<bool> isPrimeiroLogin(User user) async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(user.uid)
           .get();
-
-      final dados = snapshot.data() as Map<String, dynamic>?;
+      final dados = snapshot.data();
 
       if (dados == null) return false;
+      final primeiro = dados['primeiroLogin'] ?? false;
+      final manual = dados['loginManual'] ?? false;
 
-      final primeiroLogin = dados['primeiroLogin'] ?? false;
-      final loginManual = dados['loginManual'] ?? false;
-
-      if (primeiroLogin && loginManual) {
+      if (primeiro && manual) {
         await FirebaseFirestore.instance
             .collection('usuarios')
             .doc(user.uid)
-            .update({'primeiroLogin': false, 'loginManual': false});
+            .update({
+          'primeiroLogin': false,
+          'loginManual': false,
+        });
         return true;
       }
-
       return false;
     } catch (e) {
       print('Erro ao verificar primeiro login: $e');
@@ -87,14 +100,21 @@ class AuthService {
     }
   }
 
+  /// Logout de Firebase e Google
   Future<void> logout() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
 
+  /// Retorna o accessToken do Google (para uso no CalendarService)
   Future<String?> getGoogleAccessToken() async {
-    final googleUser = await _googleSignIn.signInSilently();
-    final googleAuth = await googleUser?.authentication;
-    return googleAuth?.accessToken;
+    GoogleSignInAccount? googleUser =
+        await _googleSignIn.signInSilently();
+    if (googleUser == null) {
+      googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null;
+    }
+    final googleAuth = await googleUser.authentication;
+    return googleAuth.accessToken;
   }
 }

@@ -1,35 +1,67 @@
+// lib/screens/login_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:studyflow/services/auth_service.dart';
 import 'package:studyflow/screens/welcome_screen.dart';
 import 'package:studyflow/screens/home_screen.dart';
-import 'package:studyflow/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  LoginScreenState createState() => LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  final authService = AuthService();
+class _LoginScreenState extends State<LoginScreen> {
+  final _authService = AuthService();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
-  Future<void> loginWithEmail() async {
-    final email = emailController.text.trim();
-    final senha = passwordController.text.trim();
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-    final user = await authService.signInWithEmail(email, senha);
+  Future<void> _loginWithEmail() async {
+    setState(() => _isLoading = true);
+
+    final user = await _authService.signInWithEmail(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
+
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao fazer login com email')),
-      );
+      _showError('Erro ao fazer login com email');
+      setState(() => _isLoading = false);
       return;
     }
 
-    await authService.criarOuAtualizarUsuario(user);
-    final primeiroLogin = await authService.isPrimeiroLogin(user);
+    await _authService.criarOuAtualizarUsuario(user);
+    final primeiroLogin = await _authService.isPrimeiroLogin(user);
+    _navigateAfterLogin(primeiroLogin, user);
+  }
 
+  Future<void> _loginWithGoogle() async {
+    setState(() => _isLoading = true);
+
+    final user = await _authService.signInWithGoogle();
+    if (user == null) {
+      _showError('Erro ao autenticar com Google');
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    await _authService.criarOuAtualizarUsuario(user);
+    final primeiroLogin = await _authService.isPrimeiroLogin(user);
+    _navigateAfterLogin(primeiroLogin, user);
+  }
+
+  void _navigateAfterLogin(bool primeiroLogin, User user) {
+    setState(() => _isLoading = false);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -40,26 +72,9 @@ class LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> loginWithGoogle() async {
-    final user = await authService.signInWithGoogle();
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao autenticar com Google')),
-      );
-      return;
-    }
-
-    await authService.criarOuAtualizarUsuario(user);
-    final primeiroLogin = await authService.isPrimeiroLogin(user);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => primeiroLogin
-            ? WelcomeScreen(user: user)
-            : const HomeScreen(),
-      ),
-    );
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -67,72 +82,84 @@ class LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'StudyFlow',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
+        child: _isLoading
+            ? const CircularProgressIndicator()
+            : SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 80),
+                    const Text(
+                      'StudyFlow',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+
+                    // Email
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Senha
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Senha',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Botão Email
+                    ElevatedButton(
+                      onPressed: _loginWithEmail,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child:
+                          const Text('Entrar', style: TextStyle(fontSize: 16)),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Botão Google
+                    OutlinedButton.icon(
+                      onPressed: _loginWithGoogle,
+                      icon: const Icon(Icons.login),
+                      label: const Text('Entrar com Google'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 40),
-              TextField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Senha',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: loginWithEmail,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Entrar', style: TextStyle(fontSize: 16)),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: loginWithGoogle,
-                icon: const Icon(Icons.login),
-                label: const Text('Entrar com Google'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
