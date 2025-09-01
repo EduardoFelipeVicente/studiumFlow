@@ -8,9 +8,12 @@ import 'package:googleapis/calendar/v3.dart' as calendar;
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// GoogleSignIn configurado com Web Client ID e escopos de Email + Calendar
+  // ----- ATENÇÃO: use aqui o Client ID do tipo WEB -----
+  static const _webClientId =
+    '109345613312-80fvn4s8sk24f047ndnnqrcv7oitf8p3.apps.googleusercontent.com';
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: '109345613312-c399mids3ek6gd4v2vpe2cr2se34mec5.apps.googleusercontent.com',
+    serverClientId: _webClientId,
     scopes: [
       'email',
       calendar.CalendarApi.calendarScope,

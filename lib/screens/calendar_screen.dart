@@ -5,6 +5,7 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:studyflow/screens/components/side_menu.dart';
 import 'package:studyflow/services/auth_service.dart';
 import 'package:studyflow/services/google_calendar_service.dart';
+import 'package:intl/intl.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({Key? key}) : super(key: key);
@@ -16,7 +17,6 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   final _authService = AuthService();
   CalendarView _currentView = CalendarView.month;
-  DateTime _focusedDay = DateTime.now();
   bool _isLoading = true;
   List<Appointment> _appointments = [];
 
@@ -39,9 +39,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       final service = GoogleCalendarService(token);
       final events = await service.fetchAppointments();
-      setState(() {
-        _appointments = events;
-      });
+      setState(() => _appointments = events);
     } catch (e) {
       _showError('Erro carregando eventos: $e');
     } finally {
@@ -49,28 +47,51 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await _authService.logout();
-    // Aqui você pode redirecionar de volta para a tela de login
-    Navigator.of(context).pushReplacementNamed('/login');
+  void _changeView(CalendarView view) {
+    setState(() => _currentView = view);
+    _loadAppointments();
   }
 
-  void _goToPreviousMonth() {
-    setState(() {
-      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
-    });
+  // Ajuste: ignora targetElement para abrir detalhes também no Mês
+  void _onCalendarTap(CalendarTapDetails details) {
+    final appts = details.appointments;
+    if (appts != null && appts.isNotEmpty) {
+      final Appointment appt = appts.first as Appointment;
+      _showAppointmentDetails(appt);
+    }
   }
 
-  void _goToNextMonth() {
-    setState(() {
-      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
-    });
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  void _showAppointmentDetails(Appointment appt) {
+    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(appt.subject),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Início: ${dateFmt.format(appt.startTime)}'),
+            Text('Fim:    ${dateFmt.format(appt.endTime)}'),
+            if (appt.notes != null) ...[
+              const SizedBox(height: 8),
+              const Text('Descrição:'),
+              Text(appt.notes!),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
     );
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -85,42 +106,50 @@ class _CalendarScreenState extends State<CalendarScreen> {
             tooltip: 'Recarregar',
             onPressed: _loadAppointments,
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sair',
-            onPressed: _logout,
-          ),
         ],
       ),
       drawer: const SideMenu(),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SfCalendar(
-              view: _currentView,
-              initialDisplayDate: _focusedDay,
-              firstDayOfWeek: 1,
-              dataSource: MeetingDataSource(_appointments),
-              monthViewSettings: const MonthViewSettings(
-                appointmentDisplayMode:
-                    MonthAppointmentDisplayMode.appointment,
-              ),
-              onViewChanged: (_) {}, // opcional, quem sabe usar depois
+      body: Column(
+        children: [
+          // Seletor de visualização
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
+                  onPressed: () => _changeView(CalendarView.day),
+                  child: const Text('Dia'),
+                ),
+                TextButton(
+                  onPressed: () => _changeView(CalendarView.week),
+                  child: const Text('Semana'),
+                ),
+                TextButton(
+                  onPressed: () => _changeView(CalendarView.month),
+                  child: const Text('Mês'),
+                ),
+              ],
             ),
-      floatingActionButton: !_isLoading
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.chevron_left),
-              label: const Text('Anterior'),
-              onPressed: _goToPreviousMonth,
-            )
-          : null,
-      bottomNavigationBar: !_isLoading
-          ? BottomAppBar(
-              child: IconButton(
-                icon: const Icon(Icons.chevron_right),
-                onPressed: _goToNextMonth,
-              ),
-            )
-          : null,
+          ),
+
+          // Loader ou calendário
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SfCalendar(
+                    view: _currentView,
+                    firstDayOfWeek: 1,
+                    dataSource: MeetingDataSource(_appointments),
+                    monthViewSettings: const MonthViewSettings(
+                      appointmentDisplayMode:
+                          MonthAppointmentDisplayMode.appointment,
+                    ),
+                    onTap: _onCalendarTap,
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
