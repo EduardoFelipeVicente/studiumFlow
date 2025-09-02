@@ -10,26 +10,14 @@ class StudyScheduleChart extends StatefulWidget {
 }
 
 class _StudyScheduleChartState extends State<StudyScheduleChart> {
-  // valores padrão
-  static const String _defaultTitulo = '[Study Flow] Sessão de Estudo';
-  static const String _defaultDescricao =
-      'Sessão gerada automaticamente pelo StudyFlow';
-
-  // Controller e FocusNode para o título
-  final TextEditingController _tituloController = TextEditingController(
-    text: _defaultTitulo,
-  );
-  final FocusNode _tituloFocusNode = FocusNode();
-
-  // Controller e FocusNode para a descrição
+  final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _descricaoController = TextEditingController(
-    text: _defaultDescricao,
+    text: 'Sessão gerada automaticamente pelo StudyFlow',
   );
-  final FocusNode _descricaoFocusNode = FocusNode();
 
   // Agendas do usuário
-  List<CalendarInfo> _agendasDisponiveis = [];
-  String? _agendaSelecionada;
+  List<String> _agendasDisponiveis = ['primary'];
+  String? _agendaSelecionada = 'primary';
 
   // Configurações de alerta, cor, transparência e visibilidade
   int _alertaMinutos = 10;
@@ -60,92 +48,6 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
 
   List<DateTime> _sessoesGeradas = [];
   List<int> _duracoesFoco = [];
-
-  void _criarListenersDeFoco() {
-    // Listener do título
-    _tituloFocusNode.addListener(() {
-      if (_tituloFocusNode.hasFocus) {
-        // Ao entrar: limpa somente se estiver no padrão
-        if (_tituloController.text == _defaultTitulo) {
-          _tituloController.clear();
-        }
-      } else {
-        // Ao sair: repõe padrão se vazio
-        if (_tituloController.text.trim().isEmpty) {
-          _tituloController.text = _defaultTitulo;
-        }
-      }
-    });
-
-    // Listener da descrição
-    _descricaoFocusNode.addListener(() {
-      if (_descricaoFocusNode.hasFocus) {
-        if (_descricaoController.text == _defaultDescricao) {
-          _descricaoController.clear();
-        }
-      } else {
-        if (_descricaoController.text.trim().isEmpty) {
-          _descricaoController.text = _defaultDescricao;
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    // liberar recursos
-    _tituloFocusNode.dispose();
-    _tituloController.dispose();
-    _descricaoFocusNode.dispose();
-    _descricaoController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _criarAgendaDeEstudos() async {
-    final token = await AuthService().getGoogleAccessToken();
-    if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao autenticar Google')),
-      );
-      return;
-    }
-    final service = GoogleCalendarService(token);
-
-    // O nome que você quer dar à nova agenda
-    const String summary = 'StudyFlow Agenda';
-
-    // Cria no Google e retorna apenas o ID
-    final String newId = await service.createCalendar(summary: summary);
-
-    // Agora monte o objeto CalendarInfo completo
-    final newCalInfo = CalendarInfo(id: newId, summary: summary);
-
-    setState(() {
-      // Adiciona o objeto CalendarInfo, não apenas a string
-      _agendasDisponiveis.add(newCalInfo);
-
-      // Mantém somente o ID selecionado
-      _agendaSelecionada = newCalInfo.id;
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _carregarAgendas();
-  }
-
-  Future<void> _carregarAgendas() async {
-    final token = await AuthService().getGoogleAccessToken();
-    if (token == null) return;
-    final service = GoogleCalendarService(token);
-
-    final list = await service.listCalendars();
-    setState(() {
-      _agendasDisponiveis = list;
-      _agendaSelecionada = list.first.id;
-    });
-  }
 
   void _gerarSessoesPomodoro() {
     final hoje = DateTime.now();
@@ -345,7 +247,6 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   // Título do evento
                   TextField(
                     controller: _tituloController,
-                    focusNode: _tituloFocusNode,
                     decoration: const InputDecoration(
                       labelText: 'Título do Evento',
                       hintText: 'Ex: Matemática, História...',
@@ -357,7 +258,6 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   // Descrição opcional
                   TextField(
                     controller: _descricaoController,
-                    focusNode: _descricaoFocusNode,
                     decoration: const InputDecoration(
                       labelText: 'Descrição (opcional)',
                       hintText: 'Sessão gerada automaticamente pelo StudyFlow',
@@ -370,17 +270,15 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   // Escolha da agenda
                   DropdownButtonFormField<String>(
                     value: _agendaSelecionada,
+                    items: _agendasDisponiveis.map((id) {
+                      return DropdownMenuItem(value: id, child: Text(id));
+                    }).toList(),
+                    onChanged: (value) =>
+                        setState(() => _agendaSelecionada = value),
                     decoration: const InputDecoration(
                       labelText: 'Agenda do Google Calendar',
                       border: OutlineInputBorder(),
                     ),
-                    items: _agendasDisponiveis.map((cal) {
-                      return DropdownMenuItem<String>(
-                        value: cal.id, // mantém o id como value
-                        child: Text(cal.summary), // exibe o summary (apelido)
-                      );
-                    }).toList(),
-                    onChanged: (v) => setState(() => _agendaSelecionada = v),
                   ),
                   TextButton(
                     onPressed: _criarAgendaDeEstudos,
@@ -415,9 +313,8 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   // Cor do evento
                   DropdownButtonFormField<String>(
                     value: _corSelecionada,
-                    items: _coresGoogle.entries.map((entry) {
-                      // entry.key → String, entry.value → Color
-                      return DropdownMenuItem<String>(
+                    items: _coresGoogle.map((entry) {
+                      return DropdownMenuItem(
                         value: entry.key,
                         child: Row(
                           children: [
@@ -648,9 +545,9 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                           start: inicio,
                           focoMinutos: focoMinutos,
                           pausaMinutos: pausaMinutos,
-                          titulo: _tituloController.text.trim(),
-                          descricao: _descricaoController.text.trim(),
-                          calendarId: _agendaSelecionada!,
+                          titulo: _titulo,
+                          descricao: _descricao,
+                          calendarId: _agendaSelecionada,
                           alertaMinutos: _alertaMinutos,
                           colorId: _corSelecionada,
                           transparency: _transparencia,

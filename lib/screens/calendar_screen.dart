@@ -8,7 +8,7 @@ import 'package:studyflow/services/google_calendar_service.dart';
 import 'package:intl/intl.dart';
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({Key? key}) : super(key: key);
+  const CalendarScreen({super.key});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -24,6 +24,144 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void initState() {
     super.initState();
     _loadAppointments();
+  }
+
+  void _showUpcomingEvents() {
+    final now = DateTime.now();
+    final upcoming =
+        _appointments.where((a) => a.startTime.isAfter(now)).toList()
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => ListView.builder(
+        itemCount: upcoming.length,
+        itemBuilder: (ctx, i) {
+          final e = upcoming[i];
+          final fmt = DateFormat('dd/MM HH:mm');
+          return ListTile(
+            title: Text(e.subject),
+            subtitle: Text(
+              '${fmt.format(e.startTime)} → ${fmt.format(e.endTime)}',
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _confirmDelete(Appointment appt) async {
+    final token = await _authService.getGoogleAccessToken();
+    if (token == null || appt.id == null) {
+      _showError('Não foi possível excluir a sessão.');
+      return;
+    }
+
+    final service = GoogleCalendarService(token);
+    await service.deleteSession(appt.id as String);
+    await _loadAppointments();
+  }
+
+  void _openEditDialog(Appointment appt) {
+    final titleCtrl = TextEditingController(text: appt.subject);
+    DateTime newStart = appt.startTime;
+    DateTime newEnd = appt.endTime;
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Editar Sessão'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(labelText: 'Título'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: newStart,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.fromDateTime(newStart),
+                  );
+                  if (time != null) {
+                    newStart = DateTime(
+                      picked.year,
+                      picked.month,
+                      picked.day,
+                      time.hour,
+                      time.minute,
+                    );
+                  }
+                }
+              },
+              child: const Text('Alterar Início'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: newEnd,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.fromDateTime(newEnd),
+                  );
+                  if (time != null) {
+                    newEnd = DateTime(
+                      picked.year,
+                      picked.month,
+                      picked.day,
+                      time.hour,
+                      time.minute,
+                    );
+                  }
+                }
+              },
+              child: const Text('Alterar Fim'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final token = await _authService.getGoogleAccessToken();
+              if (token == null || appt.id == null) {
+                _showError('Não foi possível editar a sessão.');
+                return;
+              }
+
+              final service = GoogleCalendarService(token);
+              await service.updateSession(
+                eventId: appt.id as String,
+                newStart: newStart,
+                newEnd: newEnd,
+                newSummary: titleCtrl.text.trim(),
+                newDescription: appt.notes,
+              );
+              await _loadAppointments();
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadAppointments() async {
@@ -85,6 +223,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Fechar'),
           ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _openEditDialog(appt);
+            },
+            child: const Text('Editar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmDelete(appt);
+            },
+            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
@@ -101,6 +253,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
         title: const Text('Calendário de Estudos'),
         backgroundColor: Colors.deepPurple,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            tooltip: 'Visualizar calendário',
+            onPressed: () => _changeView(CalendarView.month),
+          ),
+          IconButton(
+            icon: const Icon(Icons.list),
+            tooltip: 'Próximos eventos',
+            onPressed: _showUpcomingEvents,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Recarregar',
