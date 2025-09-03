@@ -386,6 +386,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   pausaMinutos: 0,
                   titulo: titleCtrl.text.trim(),
                   descricao: descriptionCtrl.text.trim(),
+                  sectionTypeIndex: 0,
+                  statusSectionIndex: 0,
                   calendarId: 'primary',
                   alertaMinutos: 10,
                   colorId: selectedColor,

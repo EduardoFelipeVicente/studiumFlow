@@ -4,6 +4,8 @@ import 'package:studyflow/screens/settings_screen.dart';
 import 'package:studyflow/screens/calendar_screen.dart';
 import 'package:studyflow/screens/study_schedule_screen.dart';
 import 'package:studyflow/services/auth_service.dart';
+import 'package:studyflow/screens/next_events.dart';
+
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -43,9 +45,13 @@ class SideMenu extends StatelessWidget {
             leading: const Icon(Icons.access_time),
             title: const Text('Próximas Seções'),
             onTap: () {
-              // TODO: Implementar tela de próximas seções
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+              // 1. Fecha a drawer (se estiver dentro de um Drawer)
+              Navigator.pop(context);
+
+              // 2. Navega para NextEventsScreen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NextEventsScreen()),
               );
             },
           ),
@@ -67,7 +73,9 @@ class SideMenu extends StatelessWidget {
             onTap: () {
               // TODO: Implementar tela de início de seção
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                const SnackBar(
+                  content: Text('Funcionalidade em desenvolvimento'),
+                ),
               );
             },
           ),
@@ -78,7 +86,9 @@ class SideMenu extends StatelessWidget {
             onTap: () {
               // TODO: Implementar tela de progresso
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                const SnackBar(
+                  content: Text('Funcionalidade em desenvolvimento'),
+                ),
               );
             },
           ),
@@ -89,7 +99,9 @@ class SideMenu extends StatelessWidget {
             onTap: () {
               // TODO: Implementar tela de histórico de seções
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
+                const SnackBar(
+                  content: Text('Funcionalidade em desenvolvimento'),
+                ),
               );
             },
           ),
@@ -112,7 +124,9 @@ class SideMenu extends StatelessWidget {
             title: const Text('Sair'),
             onTap: () async {
               await AuthService().logout();
-              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+              Navigator.of(
+                context,
+              ).pushNamedAndRemoveUntil('/', (route) => false);
             },
           ),
         ],

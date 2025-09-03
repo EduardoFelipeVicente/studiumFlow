@@ -638,6 +638,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                           titulo: _tituloController.text.trim(),
                           descricao: _descricaoController.text.trim(),
                           sectionTypeIndex: 1,
+                          statusSectionIndex: 1,
                           calendarId: _agendaSelecionada!,
                           alertaMinutos: _alertaMinutos,
                           colorId: _corSelecionada,

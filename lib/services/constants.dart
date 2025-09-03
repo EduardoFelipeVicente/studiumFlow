@@ -49,3 +49,11 @@ const Map<int, String> typeSection = {
   3:  'Trabalho',
   4:  'Outros',
 };
+
+const Map<int, String> statusSection = {
+  0:  'Nenhum',
+  1:  'Agendado',
+  2:  'Concluido',
+  3:  'Atrasado',
+  4:  'Outros',
+};

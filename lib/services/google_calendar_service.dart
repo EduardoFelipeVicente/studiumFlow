@@ -83,6 +83,7 @@ class GoogleCalendarService {
     String? titulo,
     String? descricao,
     int? sectionTypeIndex, // índice para escolher o rótulo
+    int? statusSectionIndex,
     String calendarId = 'primary',
     int alertaMinutos = 10,
     String colorId = '6',
@@ -91,6 +92,7 @@ class GoogleCalendarService {
   }) async {
     // 1. Extrai o rótulo baseado no índice (fallback para 'Nenhum')
     final sectionLabel = typeSection[sectionTypeIndex] ?? typeSection[0]!;
+    final statusLabel = statusSection[statusSectionIndex] ?? statusSection[0]!;
 
     // 2. Normaliza horário de início e fim
     final localStart = DateTime(
@@ -140,7 +142,8 @@ class GoogleCalendarService {
         )
         ..extendedProperties = calendar.EventExtendedProperties(
           private: {
-            'type': sectionLabel, // aqui o rótulo dinâmico
+            'type': sectionLabel, 
+            'status' : statusLabel,// aqui o rótulo dinâmico
           },
         );
 
@@ -149,6 +152,38 @@ class GoogleCalendarService {
       client.close();
     }
   }
+
+Future<List<calendar.Event>> fetchNextStudySessions({
+  String calendarId = 'primary',
+  int maxResults = 20,
+  List<String>? privateExtendedProperties,
+}) async {
+  // 1. calcula expiry e cria client autenticado
+  final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
+  final client = _buildClient(expiryUtc: expiry);
+
+  // 2. cria a instância da API
+  final api = calendar.CalendarApi(client);
+
+  try {
+    // 3. faz a chamada list com o filtro em extendedProperties.private['type']
+    final now = DateTime.now().toUtc();
+    final resp = await api.events.list(
+      calendarId,
+      timeMin: now,
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: maxResults,
+      privateExtendedProperty: privateExtendedProperties,
+    );
+
+    // 4. retorna a lista (ou vazia)
+    return resp.items ?? <calendar.Event>[];
+  } finally {
+    // 5. não esqueça de fechar o client
+    client.close();
+  }
+}
 
   /// Busca sessões do dia atual em diante e converte para Appointment
   Future<List<Appointment>> fetchAppointments() async {
