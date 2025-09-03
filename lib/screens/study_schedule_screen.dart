@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/services/google_calendar_service.dart';
 import 'package:studyflow/services/auth_service.dart';
+import 'package:studyflow/services/constants.dart';
 
 class StudyScheduleChart extends StatefulWidget {
   const StudyScheduleChart({super.key});
@@ -10,22 +11,21 @@ class StudyScheduleChart extends StatefulWidget {
 }
 
 class _StudyScheduleChartState extends State<StudyScheduleChart> {
-  // valores padrão
-  static const String _defaultTitulo = '[Study Flow] Sessão de Estudo';
-  static const String _defaultDescricao =
-      'Sessão gerada automaticamente pelo StudyFlow';
+
 
   // Controller e FocusNode para o título
   final TextEditingController _tituloController = TextEditingController(
-    text: _defaultTitulo,
+    text: defaultStudySessionTitle,
   );
   final FocusNode _tituloFocusNode = FocusNode();
 
   // Controller e FocusNode para a descrição
   final TextEditingController _descricaoController = TextEditingController(
-    text: _defaultDescricao,
+    text: defaultStudySessionDescription,
   );
   final FocusNode _descricaoFocusNode = FocusNode();
+
+  final Map<String, Color> _coresGoogle = eventColorMap;
 
   // Agendas do usuário
   List<CalendarInfo> _agendasDisponiveis = [];
@@ -36,21 +36,6 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
   String _corSelecionada = '6';
   String _transparencia = 'opaque'; // 'opaque' ou 'transparent'
   String _visibilidade = 'default'; // 'default', 'public', 'private'
-
-  // Mapa de cores (ID Google → Color)
-  final Map<String, Color> _coresGoogle = {
-    '1': Colors.blue,
-    '2': Colors.green,
-    '3': Colors.purple,
-    '4': Colors.red,
-    '5': Colors.orange,
-    '6': Colors.deepPurple,
-    '7': Colors.teal,
-    '8': Colors.pink,
-    '9': Colors.brown,
-    '10': Colors.cyan,
-    '11': Colors.indigo,
-  };
 
   TimeOfDay _inicio = const TimeOfDay(hour: 14, minute: 0);
   TimeOfDay _fim = const TimeOfDay(hour: 16, minute: 0);
@@ -66,13 +51,13 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
     _tituloFocusNode.addListener(() {
       if (_tituloFocusNode.hasFocus) {
         // Ao entrar: limpa somente se estiver no padrão
-        if (_tituloController.text == _defaultTitulo) {
+        if (_tituloController.text == defaultStudySessionTitle) {
           _tituloController.clear();
         }
       } else {
         // Ao sair: repõe padrão se vazio
         if (_tituloController.text.trim().isEmpty) {
-          _tituloController.text = _defaultTitulo;
+          _tituloController.text = defaultStudySessionTitle;
         }
       }
     });
@@ -80,12 +65,12 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
     // Listener da descrição
     _descricaoFocusNode.addListener(() {
       if (_descricaoFocusNode.hasFocus) {
-        if (_descricaoController.text == _defaultDescricao) {
+        if (_descricaoController.text == defaultStudySessionDescription) {
           _descricaoController.clear();
         }
       } else {
         if (_descricaoController.text.trim().isEmpty) {
-          _descricaoController.text = _defaultDescricao;
+          _descricaoController.text = defaultStudySessionDescription;
         }
       }
     });
@@ -412,13 +397,20 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Cor do evento
                   DropdownButtonFormField<String>(
                     value: _corSelecionada,
+                    decoration: const InputDecoration(
+                      labelText: 'Cor do Evento',
+                      border: OutlineInputBorder(),
+                    ),
                     items: _coresGoogle.entries.map((entry) {
-                      // entry.key → String, entry.value → Color
+                      final id = entry.key;
+                      final color = entry.value;
+                      final name = eventColorNames[id]!;
+
+                      // Cor do Evento
                       return DropdownMenuItem<String>(
-                        value: entry.key,
+                        value: id,
                         child: Row(
                           children: [
                             Container(
@@ -426,21 +418,17 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                               height: 16,
                               margin: const EdgeInsets.only(right: 8),
                               decoration: BoxDecoration(
-                                color: entry.value,
+                                color: color,
                                 shape: BoxShape.circle,
                               ),
                             ),
-                            Text('Cor ${entry.key}'),
+                            Text(name),
                           ],
                         ),
                       );
                     }).toList(),
                     onChanged: (value) =>
                         setState(() => _corSelecionada = value ?? '6'),
-                    decoration: const InputDecoration(
-                      labelText: 'Cor do Evento',
-                      border: OutlineInputBorder(),
-                    ),
                   ),
                   const SizedBox(height: 12),
 

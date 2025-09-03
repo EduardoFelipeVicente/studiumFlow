@@ -75,54 +75,71 @@ class GoogleCalendarService {
     }
   }
 
-/// Insere uma nova sessão de estudo no Google Calendar
-Future<void> insertStudySession({
-  required DateTime start,
-  required int focoMinutos,
-  required int pausaMinutos,
-  String? titulo,
-  String? descricao,
-  String calendarId = 'primary',
-  int alertaMinutos = 10,
-  String colorId = '6',
-  String transparency = 'opaque',
-  String visibility = 'default',
-}) async {
-  final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
-  final client = _buildClient(expiryUtc: expiry);
-  final api = calendar.CalendarApi(client);
+  /// Insere uma nova sessão de estudo no Google Calendar
+  Future<void> insertStudySession({
+    required DateTime start, // já deve vir como local
+    required int focoMinutos,
+    required int pausaMinutos,
+    String? titulo,
+    String? descricao,
+    String calendarId = 'primary',
+    int alertaMinutos = 10,
+    String colorId = '6',
+    String transparency = 'opaque',
+    String visibility = 'default',
+  }) async {
+    final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
+    final client = _buildClient(expiryUtc: expiry);
+    final api = calendar.CalendarApi(client);
 
-  try {
-    // Usa exatamente o DateTime passado, sem conversões
-    final eventEnd = start.add(Duration(minutes: focoMinutos + pausaMinutos));
-    final tzName = start.timeZoneName;
+    try {
+      // Calcula fim da sessão
+      final eventEnd = start.add(Duration(minutes: focoMinutos + pausaMinutos));
 
-    final event = calendar.Event()
-      ..summary     = titulo    ?? '[StudyFlow] Sessão de Estudo'
-      ..description = descricao ?? 'Sessão gerada automaticamente pelo StudyFlow'
-      ..start = calendar.EventDateTime(
-        dateTime: start,
-        timeZone: 'UTC',
-      )
-      ..end = calendar.EventDateTime(
-        dateTime: eventEnd,
-        timeZone: 'UTC',
-      )
-      ..colorId      = colorId
-      ..transparency = transparency
-      ..visibility   = visibility
-      ..reminders = calendar.EventReminders(
-        useDefault: false,
-        overrides: [
-          calendar.EventReminder(method: 'popup', minutes: alertaMinutos),
-        ],
+      // Garante que ambos são horários locais (sem UTC)
+      final localStart = DateTime(
+        start.year,
+        start.month,
+        start.day,
+        start.hour,
+        start.minute,
       );
 
-    await api.events.insert(event, calendarId);
-  } finally {
-    client.close();
+      final localEnd = DateTime(
+        eventEnd.year,
+        eventEnd.month,
+        eventEnd.day,
+        eventEnd.hour,
+        eventEnd.minute,
+      );
+
+      final event = calendar.Event()
+        ..summary = titulo ?? '[StudyFlow] Sessão de Estudo'
+        ..description =
+            descricao ?? 'Sessão gerada automaticamente pelo StudyFlow'
+        ..start = calendar.EventDateTime(
+          dateTime: localStart,
+          timeZone: 'America/Sao_Paulo',
+        )
+        ..end = calendar.EventDateTime(
+          dateTime: localEnd,
+          timeZone: 'America/Sao_Paulo',
+        )
+        ..colorId = colorId
+        ..transparency = transparency
+        ..visibility = visibility
+        ..reminders = calendar.EventReminders(
+          useDefault: false,
+          overrides: [
+            calendar.EventReminder(method: 'popup', minutes: alertaMinutos),
+          ],
+        );
+
+      await api.events.insert(event, calendarId);
+    } finally {
+      client.close();
+    }
   }
-}
 
   /// Busca sessões do dia atual em diante e converte para Appointment
   Future<List<Appointment>> fetchAppointments() async {
