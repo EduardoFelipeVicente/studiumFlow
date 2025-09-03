@@ -41,3 +41,11 @@ const Map<String, String> eventColorNames = {
  '11':  'Vermelho',
  '12':  'Laranja',
 };
+
+const Map<int, String> typeSection = {
+  0:  'Nenhum',
+  1:  'Seção Estudo',
+  2:  'Prova',
+  3:  'Trabalho',
+  4:  'Outros',
+};

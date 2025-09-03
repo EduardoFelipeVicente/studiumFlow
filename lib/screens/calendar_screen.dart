@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:intl/intl.dart';
-import 'package:studyflow/screens/components/side_menu.dart';
+import 'package:studyflow/components/side_menu.dart';
 import 'package:studyflow/services/auth_service.dart';
 import 'package:studyflow/services/google_calendar_service.dart';
 import 'package:studyflow/services/constants.dart';
@@ -261,7 +261,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
                 // Cor do Evento
                 DropdownButtonFormField<String>(
-                  value: selectedColor,
+                  initialValue: selectedColor,
                   decoration: const InputDecoration(labelText: 'Cor do Evento'),
                   items: eventColorNames.keys.map((id) {
                     return DropdownMenuItem<String>(
@@ -289,7 +289,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
                 // Visibilidade
                 DropdownButtonFormField<String>(
-                  value: selectedVisibility,
+                  initialValue: selectedVisibility,
                   decoration: const InputDecoration(labelText: 'Visibilidade'),
                   items: const [
                     DropdownMenuItem(value: 'default', child: Text('Padrão')),

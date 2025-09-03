@@ -5,6 +5,7 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
+import 'package:studyflow/services/constants.dart';
 
 class CalendarInfo {
   final String id;
@@ -75,48 +76,51 @@ class GoogleCalendarService {
     }
   }
 
-  /// Insere uma nova sessão de estudo no Google Calendar
   Future<void> insertStudySession({
-    required DateTime start, // já deve vir como local
+    required DateTime start, // horário local
     required int focoMinutos,
     required int pausaMinutos,
     String? titulo,
     String? descricao,
+    int? sectionTypeIndex, // índice para escolher o rótulo
     String calendarId = 'primary',
     int alertaMinutos = 10,
     String colorId = '6',
     String transparency = 'opaque',
     String visibility = 'default',
   }) async {
+    // 1. Extrai o rótulo baseado no índice (fallback para 'Nenhum')
+    final sectionLabel = typeSection[sectionTypeIndex] ?? typeSection[0]!;
+
+    // 2. Normaliza horário de início e fim
+    final localStart = DateTime(
+      start.year,
+      start.month,
+      start.day,
+      start.hour,
+      start.minute,
+    );
+    final eventEnd = localStart.add(
+      Duration(minutes: focoMinutos + pausaMinutos),
+    );
+    final localEnd = DateTime(
+      eventEnd.year,
+      eventEnd.month,
+      eventEnd.day,
+      eventEnd.hour,
+      eventEnd.minute,
+    );
+
+    // 3. Configura cliente e API
     final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
     final client = _buildClient(expiryUtc: expiry);
     final api = calendar.CalendarApi(client);
 
     try {
-      // Calcula fim da sessão
-      final eventEnd = start.add(Duration(minutes: focoMinutos + pausaMinutos));
-
-      // Garante que ambos são horários locais (sem UTC)
-      final localStart = DateTime(
-        start.year,
-        start.month,
-        start.day,
-        start.hour,
-        start.minute,
-      );
-
-      final localEnd = DateTime(
-        eventEnd.year,
-        eventEnd.month,
-        eventEnd.day,
-        eventEnd.hour,
-        eventEnd.minute,
-      );
-
-      final event = calendar.Event()
-        ..summary = titulo ?? '[StudyFlow] Sessão de Estudo'
-        ..description =
-            descricao ?? 'Sessão gerada automaticamente pelo StudyFlow'
+      final ev = calendar.Event()
+        // opcional: usar o label no título
+        ..summary = titulo ?? '[StudyFlow] $sectionLabel'
+        ..description = descricao ?? 'Gerada automaticamente pelo StudyFlow'
         ..start = calendar.EventDateTime(
           dateTime: localStart,
           timeZone: 'America/Sao_Paulo',
@@ -133,9 +137,14 @@ class GoogleCalendarService {
           overrides: [
             calendar.EventReminder(method: 'popup', minutes: alertaMinutos),
           ],
+        )
+        ..extendedProperties = calendar.EventExtendedProperties(
+          private: {
+            'type': sectionLabel, // aqui o rótulo dinâmico
+          },
         );
 
-      await api.events.insert(event, calendarId);
+      await api.events.insert(ev, calendarId);
     } finally {
       client.close();
     }

@@ -118,6 +118,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
   void initState() {
     super.initState();
     _carregarAgendas();
+    _criarListenersDeFoco();
   }
 
   Future<void> _carregarAgendas() async {
@@ -156,7 +157,6 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
           int tempoDisponivel = fimMinutos - inicioMinutos;
 
           final List<int> blocos = [];
-          int contadorFocoDia = 0;
 
           while (true) {
             int foco = maxFoco;
@@ -169,7 +169,6 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
 
             blocos.add(foco);
             tempoDisponivel -= foco;
-            contadorFocoDia++;
 
             final pausa = pausaCurta;
             if (tempoDisponivel >= pausa) {
@@ -354,7 +353,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
 
                   // Escolha da agenda
                   DropdownButtonFormField<String>(
-                    value: _agendaSelecionada,
+                    initialValue: _agendaSelecionada,
                     decoration: const InputDecoration(
                       labelText: 'Agenda do Google Calendar',
                       border: OutlineInputBorder(),
@@ -381,7 +380,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
 
                   // Tempo de alerta
                   DropdownButtonFormField<int>(
-                    value: _alertaMinutos,
+                    initialValue: _alertaMinutos,
                     items: [5, 10, 15, 30].map((min) {
                       return DropdownMenuItem(
                         value: min,
@@ -398,7 +397,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   const SizedBox(height: 12),
 
                   DropdownButtonFormField<String>(
-                    value: _corSelecionada,
+                    initialValue: _corSelecionada,
                     decoration: const InputDecoration(
                       labelText: 'Cor do Evento',
                       border: OutlineInputBorder(),
@@ -434,7 +433,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
 
                   // Transparência
                   DropdownButtonFormField<String>(
-                    value: _transparencia,
+                    initialValue: _transparencia,
                     items: const [
                       DropdownMenuItem(value: 'opaque', child: Text('Ocupado')),
                       DropdownMenuItem(
@@ -453,7 +452,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
 
                   // Visibilidade
                   DropdownButtonFormField<String>(
-                    value: _visibilidade,
+                    initialValue: _visibilidade,
                     items: const [
                       DropdownMenuItem(value: 'default', child: Text('Padrão')),
                       DropdownMenuItem(value: 'public', child: Text('Público')),
@@ -638,6 +637,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                           pausaMinutos: pausaMinutos,
                           titulo: _tituloController.text.trim(),
                           descricao: _descricaoController.text.trim(),
+                          sectionTypeIndex: 1,
                           calendarId: _agendaSelecionada!,
                           alertaMinutos: _alertaMinutos,
                           colorId: _corSelecionada,

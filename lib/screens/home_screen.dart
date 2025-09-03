@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:studyflow/screens/components/side_menu.dart';
+import 'package:studyflow/components/side_menu.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});

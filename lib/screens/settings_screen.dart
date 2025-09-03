@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:studyflow/services/auth_service.dart';
-import 'package:studyflow/screens/components/side_menu.dart';
+import 'package:studyflow/components/side_menu.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
