@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:intl/intl.dart';
 
+import '../components/side_menu.dart';
 import '../services/auth_service.dart';
 import '../services/google_calendar_service.dart';
 import '../services/constants.dart';
@@ -17,90 +18,93 @@ class NextEventsScreen extends StatefulWidget {
 
 class _NextEventsScreenState extends State<NextEventsScreen> {
   final _authService = AuthService();
+  late final GoogleCalendarService _service;
+  List<calendar.Event> _events = [];
+  bool _isLoading = false;
 
-  // Tipos que podem ser filtrados (sem o “0: Nenhum” por padrão)
   late final List<int> _allTypes;
   Set<int> _selectedTypes = {};
-
-  bool _isLoading = false;
-  List<calendar.Event> _events = [];
+  bool _groupByDate = true;
 
   @override
   void initState() {
     super.initState();
-    // Todos os índices exceto o 0 (Nenhum)
     _allTypes = typeSection.keys.where((k) => k != 0).toList();
     _selectedTypes = Set.from(_allTypes);
-    _loadEvents();
+    _init();
+  }
+
+  Future<void> _init() async {
+    setState(() => _isLoading = true);
+    final token = await _authService.getGoogleAccessToken();
+    if (token == null) {
+      _showError('Não foi possível obter credenciais Google.');
+      return;
+    }
+    _service = GoogleCalendarService(token);
+    await _loadEvents();
   }
 
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
+    final allItems = <calendar.Event>[];
 
-    final token = await _authService.getGoogleAccessToken();
-    if (token == null) {
-      _showError('Não foi possível obter credenciais do Google.');
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      final service = GoogleCalendarService(token);
-
-      // Constrói a lista de filtros para extendedProperties
-      final filters = _selectedTypes
-          .map((idx) => 'type=${typeSection[idx]}')
-          .toList();
-
-      // Busca os próximos 20 eventos com `type` nas propriedades privadas
-      final items = await service.fetchNextStudySessions(
-        calendarId: 'primary',
+    for (var idx in _selectedTypes) {
+      final label = typeSection[idx]!;
+      final items = await _service.fetchNextStudySessions(
         maxResults: 20,
-        privateExtendedProperties: filters,
+        privateExtendedProperties: ['type=$label'],
       );
-
-      setState(() => _events = items);
-    } catch (e) {
-      _showError('Erro ao carregar eventos: $e');
-    } finally {
-      setState(() => _isLoading = false);
+      allItems.addAll(items);
     }
+
+    allItems.sort((a, b) {
+      final aDt = a.start?.dateTime?.toUtc() ?? DateTime(0);
+      final bDt = b.start?.dateTime?.toUtc() ?? DateTime(0);
+      return aDt.compareTo(bDt);
+    });
+
+    setState(() {
+      _events = allItems.take(20).toList();
+      _isLoading = false;
+    });
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+    final dateFmt = DateFormat('dd/MM/yyyy');
+    final timeFmt = DateFormat('HH:mm');
 
     return Scaffold(
+      // 1) adiciona Sidebar
+      drawer: const SideMenu(),
+
       appBar: AppBar(
         title: const Text('Próximas Seções'),
         backgroundColor: Colors.deepPurple,
       ),
       body: Column(
         children: [
-          // --- filtros de tipoSection ---
+          // filtros de tipo
           Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             child: Wrap(
               spacing: 8,
               children: _allTypes.map((idx) {
                 final label = typeSection[idx]!;
-                final selected = _selectedTypes.contains(idx);
                 return FilterChip(
                   label: Text(label),
-                  selected: selected,
+                  selected: _selectedTypes.contains(idx),
                   onSelected: (sel) {
                     setState(() {
-                      if (sel) {
+                      if (sel)
                         _selectedTypes.add(idx);
-                      } else {
+                      else
                         _selectedTypes.remove(idx);
-                      }
                     });
                     _loadEvents();
                   },
@@ -109,51 +113,147 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
             ),
           ),
 
+          // toggle Agrupar
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: ToggleButtons(
+              isSelected: [_groupByDate, !_groupByDate],
+              onPressed: (i) {
+                setState(() => _groupByDate = (i == 0));
+              },
+              borderRadius: BorderRadius.circular(8),
+              selectedColor: Colors.white,
+              fillColor: Colors.deepPurple,
+              children: const [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('Por Data'),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('Por Tipo'),
+                ),
+              ],
+            ),
+          ),
+
           const Divider(height: 1),
 
-          // --- lista de eventos ---
+          // lista de eventos ou loading
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _events.isEmpty
-                    ? const Center(child: Text('Nenhuma seção encontrada.'))
-                    : ListView.separated(
-                        itemCount: _events.length,
-                        separatorBuilder: (_, __) => const Divider(),
-                        itemBuilder: (ctx, i) {
-                          final ev = _events[i];
-                          final start = ev.start?.dateTime?.toLocal();
-                          final end   = ev.end?.dateTime?.toLocal();
-                          final type  = ev.extendedProperties
-                                          ?.private?['type'] ??
-                                        '—';
-
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: 
-                                eventColorMap.entries
-                                  .firstWhere((e) => e.key == ev.colorId, orElse: () => MapEntry('6', eventColorMap['6']!))
-                                  .value,
-                              child: Text(
-                                typeSection.entries
-                                  .firstWhere((e) => e.value == type, orElse: () => MapEntry(1, 'Seção Estudo'))
-                                  .key
-                                  .toString(),
-                                style: const TextStyle(fontSize: 12, color: Colors.white),
-                              ),
-                            ),
-                            title: Text(ev.summary ?? '(Sem título)'),
-                            subtitle: Text(
-                              '${type} • '
-                              '${start != null ? dateFmt.format(start) : ''}'
-                              '${end != null ? ' – ${dateFmt.format(end)}' : ''}',
-                            ),
-                          );
-                        },
-                      ),
+                : _buildGroupedList(dateFmt, timeFmt),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildGroupedList(DateFormat dateFmt, DateFormat timeFmt) {
+    if (_events.isEmpty) {
+      return const Center(child: Text('Nenhuma seção encontrada.'));
+    }
+    final list = _groupByDate
+        ? _buildByDate(dateFmt, timeFmt)
+        : _buildByType(dateFmt, timeFmt);
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: list,
+    );
+  }
+
+  List<Widget> _buildByDate(DateFormat dateFmt, DateFormat timeFmt) {
+    final Map<String, List<calendar.Event>> grouped = {};
+    for (var ev in _events) {
+      final dt = ev.start?.dateTime?.toLocal();
+      if (dt == null) continue;
+      final key = dateFmt.format(dt);
+      grouped.putIfAbsent(key, () => []).add(ev);
+    }
+    final dates = grouped.keys.toList()
+      ..sort((a, b) => dateFmt.parse(a).compareTo(dateFmt.parse(b)));
+
+    final widgets = <Widget>[];
+    for (var dateKey in dates) {
+      widgets.add(_buildSectionHeader(dateKey));
+      for (var ev in grouped[dateKey]!) {
+        widgets.add(_buildEventTile(ev, dateFmt, timeFmt));
+      }
+    }
+    return widgets;
+  }
+
+  List<Widget> _buildByType(DateFormat dateFmt, DateFormat timeFmt) {
+    final Map<String, List<calendar.Event>> grouped = {};
+    for (var ev in _events) {
+      final type = ev.extendedProperties?.private?['type'] ?? '—';
+      grouped.putIfAbsent(type, () => []).add(ev);
+    }
+    final preferredOrder = [
+      typeSection[1]!,
+      typeSection[2]!,
+      typeSection[3]!,
+      typeSection[4]!,
+    ];
+    final widgets = <Widget>[];
+    for (var typeLabel in preferredOrder) {
+      final list = grouped[typeLabel];
+      if (list == null || list.isEmpty) continue;
+      widgets.add(_buildSectionHeader(typeLabel));
+      for (var ev in list) {
+        widgets.add(_buildEventTile(ev, dateFmt, timeFmt, isTypeMode: true));
+      }
+    }
+    return widgets;
+  }
+
+  Widget _buildSectionHeader(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildEventTile(
+    calendar.Event ev,
+    DateFormat dateFmt,
+    DateFormat timeFmt, {
+    bool isTypeMode = false,
+  }) {
+    final start = ev.start?.dateTime?.toLocal();
+    final end = ev.end?.dateTime?.toLocal();
+
+    final parts = <String>[];
+
+    if (!isTypeMode) {
+      // MODO POR DATA: mostra apenas tipo + horário
+      final type = ev.extendedProperties?.private?['type'];
+      if (type != null && type.isNotEmpty) {
+        parts.add(type);
+      }
+      if (start != null && end != null) {
+        parts.add('${timeFmt.format(start)} – ${timeFmt.format(end)}');
+      }
+    } else {
+      // MODO POR TIPO: mostra data + horário
+      if (start != null && end != null) {
+        parts.add(
+          '${dateFmt.format(start)} ${timeFmt.format(start)} – ${timeFmt.format(end)}',
+        );
+      }
+    }
+
+    final subtitleText = parts.join(' • ');
+    final color = eventColorMap[ev.colorId] ?? Colors.deepPurple;
+
+    return ListTile(
+      leading: Icon(Icons.event, color: color),
+      title: Text(ev.summary ?? '(Sem título)'),
+      subtitle: subtitleText.isEmpty ? null : Text(subtitleText),
     );
   }
 }
