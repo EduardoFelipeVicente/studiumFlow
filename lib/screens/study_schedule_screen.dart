@@ -11,8 +11,6 @@ class StudyScheduleChart extends StatefulWidget {
 }
 
 class _StudyScheduleChartState extends State<StudyScheduleChart> {
-
-
   // Controller e FocusNode para o título
   final TextEditingController _tituloController = TextEditingController(
     text: defaultStudySessionTitle,
@@ -133,7 +131,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
     });
   }
 
-  void _gerarSessoesPomodoro() {
+  void _gerarSessoes() {
     final hoje = DateTime.now();
     final List<DateTime> novasSessoes = [];
     final List<int> novasDuracoes = [];
@@ -143,73 +141,39 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
       _duracoesFoco.clear();
     }
 
-    const int minFoco = 20;
-    const int maxFoco = 30;
-    const int pausaCurta = 5;
-    const int pausaLonga = 15;
-
     for (int semana = 0; semana < _semanas; semana++) {
       for (int i = 0; i < 7; i++) {
         if (_diasSelecionados[i]) {
           final diaBase = hoje.add(Duration(days: i + semana * 7));
+
           final inicioMinutos = _inicio.hour * 60 + _inicio.minute;
           final fimMinutos = _fim.hour * 60 + _fim.minute;
-          int tempoDisponivel = fimMinutos - inicioMinutos;
+          final duracaoTotal = fimMinutos - inicioMinutos;
 
-          final List<int> blocos = [];
+          final horaInicio = inicioMinutos ~/ 60;
+          final minutoInicio = inicioMinutos % 60;
 
-          while (true) {
-            int foco = maxFoco;
-            while (foco >= minFoco) {
-              if (tempoDisponivel >= foco + pausaCurta) break;
-              foco--;
-            }
+          final sessao = DateTime(
+            diaBase.year,
+            diaBase.month,
+            diaBase.day,
+            horaInicio,
+            minutoInicio,
+          );
 
-            if (foco < minFoco || tempoDisponivel < foco + pausaCurta) break;
+          final focoFim = sessao.add(Duration(minutes: duracaoTotal));
 
-            blocos.add(foco);
-            tempoDisponivel -= foco;
-
-            final pausa = pausaCurta;
-            if (tempoDisponivel >= pausa) {
-              tempoDisponivel -= pausa;
-            } else {
-              break;
-            }
-          }
-
-          int tempoAtual = inicioMinutos;
-          for (int j = 0; j < blocos.length; j++) {
-            final focoMinutos = blocos[j];
-            final hora = tempoAtual ~/ 60;
-            final minuto = tempoAtual % 60;
-            final sessao = DateTime(
-              diaBase.year,
-              diaBase.month,
-              diaBase.day,
-              hora,
-              minuto,
+          // Verifica sobreposição
+          final sobrepoe = _sessoesGeradas.any((s) {
+            final fimExistente = s.add(
+              Duration(minutes: _duracoesFoco[_sessoesGeradas.indexOf(s)]),
             );
-            final focoFim = sessao.add(Duration(minutes: focoMinutos));
+            return (sessao.isBefore(fimExistente) && focoFim.isAfter(s));
+          });
 
-            // Verifica sobreposição
-            final sobrepoe = _sessoesGeradas.any((s) {
-              final fimExistente = s.add(
-                Duration(minutes: _duracoesFoco[_sessoesGeradas.indexOf(s)]),
-              );
-              return (sessao.isBefore(fimExistente) && focoFim.isAfter(s));
-            });
-
-            if (!sobrepoe) {
-              novasSessoes.add(sessao);
-              novasDuracoes.add(focoMinutos);
-            }
-
-            tempoAtual += focoMinutos;
-            final pausa = (blocos.length > 4 && (j + 1) % 4 == 0)
-                ? pausaLonga
-                : pausaCurta;
-            tempoAtual += pausa;
+          if (!sobrepoe) {
+            novasSessoes.add(sessao);
+            novasDuracoes.add(duracaoTotal);
           }
         }
       }
@@ -498,7 +462,7 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _gerarSessoesPomodoro,
+                    onPressed: _gerarSessoes,
                     icon: const Icon(Icons.play_arrow, color: Colors.white),
                     label: const Text(
                       'Gerar Secoes',
@@ -526,62 +490,22 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                   const SizedBox(height: 8),
                   ..._sessoesGeradas.asMap().entries.map((entry) {
                     final index = entry.key;
-                    final focoInicio = entry.value;
-                    final focoMinutos = _duracoesFoco[index];
-                    final focoFim = focoInicio.add(
-                      Duration(minutes: focoMinutos),
-                    );
-
-                    final diaAtual = DateTime(
-                      focoInicio.year,
-                      focoInicio.month,
-                      focoInicio.day,
-                    );
-                    final sessoesDoDia = _sessoesGeradas
-                        .where(
-                          (s) =>
-                              s.year == diaAtual.year &&
-                              s.month == diaAtual.month &&
-                              s.day == diaAtual.day,
-                        )
-                        .toList();
-
-                    final indexNoDia = sessoesDoDia.indexOf(focoInicio);
-                    final pausaMinutos =
-                        (sessoesDoDia.length > 4 && (indexNoDia + 1) % 4 == 0)
-                        ? 15
-                        : 5;
-                    final pausaFim = focoFim.add(
-                      Duration(minutes: pausaMinutos),
-                    );
+                    final inicio = entry.value;
+                    final duracao = _duracoesFoco[index];
+                    final fim = inicio.add(Duration(minutes: duracao));
 
                     final dia =
-                        '${focoInicio.day.toString().padLeft(2, '0')}/${focoInicio.month.toString().padLeft(2, '0')}';
-                    final horaFocoInicio =
-                        '${focoInicio.hour.toString().padLeft(2, '0')}:${focoInicio.minute.toString().padLeft(2, '0')}';
-                    final horaFocoFim =
-                        '${focoFim.hour.toString().padLeft(2, '0')}:${focoFim.minute.toString().padLeft(2, '0')}';
-                    final horaPausa =
-                        '${pausaFim.hour.toString().padLeft(2, '0')}:${pausaFim.minute.toString().padLeft(2, '0')}';
+                        '${inicio.day.toString().padLeft(2, '0')}/${inicio.month.toString().padLeft(2, '0')}';
+                    final horaInicio =
+                        '${inicio.hour.toString().padLeft(2, '0')}:${inicio.minute.toString().padLeft(2, '0')}';
+                    final horaFim =
+                        '${fim.hour.toString().padLeft(2, '0')}:${fim.minute.toString().padLeft(2, '0')}';
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(color: Colors.black),
-                          children: [
-                            TextSpan(
-                              text: '$dia * $horaFocoInicio–$horaFocoFim–',
-                            ),
-                            TextSpan(
-                              text: horaPausa,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextSpan(text: ' ($pausaMinutos min pausa)'),
-                          ],
-                        ),
+                      child: Text(
+                        '$dia • $horaInicio–$horaFim ($duracao min)',
+                        style: const TextStyle(fontSize: 14),
                       ),
                     );
                   }),
@@ -625,16 +549,10 @@ class _StudyScheduleChartState extends State<StudyScheduleChart> {
                             .toList();
 
                         final indexNoDia = sessoesDoDia.indexOf(inicio);
-                        final pausaMinutos =
-                            (sessoesDoDia.length > 4 &&
-                                (indexNoDia + 1) % 4 == 0)
-                            ? 15
-                            : 5;
 
                         await calendarService.insertStudySession(
                           start: inicio,
                           focoMinutos: focoMinutos,
-                          pausaMinutos: pausaMinutos,
                           titulo: _tituloController.text.trim(),
                           descricao: _descricaoController.text.trim(),
                           sectionTypeIndex: 1,

@@ -5,7 +5,7 @@ import 'package:studyflow/screens/calendar_screen.dart';
 import 'package:studyflow/screens/study_schedule_screen.dart';
 import 'package:studyflow/services/auth_service.dart';
 import 'package:studyflow/screens/next_events.dart';
-
+import 'package:studyflow/screens/study_session.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -71,11 +71,10 @@ class SideMenu extends StatelessWidget {
             leading: const Icon(Icons.play_circle_fill),
             title: const Text('Iniciar Seção'),
             onTap: () {
-              // TODO: Implementar tela de início de seção
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Funcionalidade em desenvolvimento'),
-                ),
+              Navigator.pop(context); // fecha o drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StudySessionScreen()),
               );
             },
           ),

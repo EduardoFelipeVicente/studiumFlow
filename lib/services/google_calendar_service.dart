@@ -79,7 +79,6 @@ class GoogleCalendarService {
   Future<void> insertStudySession({
     required DateTime start, // horário local
     required int focoMinutos,
-    required int pausaMinutos,
     String? titulo,
     String? descricao,
     int? sectionTypeIndex, // índice para escolher o rótulo
@@ -103,7 +102,7 @@ class GoogleCalendarService {
       start.minute,
     );
     final eventEnd = localStart.add(
-      Duration(minutes: focoMinutos + pausaMinutos),
+      Duration(minutes: focoMinutos),
     );
     final localEnd = DateTime(
       eventEnd.year,

@@ -383,7 +383,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 await service.insertStudySession(
                   start: newStart,
                   focoMinutos: newEnd.difference(newStart).inMinutes,
-                  pausaMinutos: 0,
                   titulo: titleCtrl.text.trim(),
                   descricao: descriptionCtrl.text.trim(),
                   sectionTypeIndex: 0,
