@@ -12,7 +12,9 @@ class StudyScheduleScreen extends StatefulWidget {
 
 class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
   final _tituloCtrl = TextEditingController(text: defaultStudySessionTitle);
-  final _descricaoCtrl = TextEditingController(text: defaultStudySessionDescription);
+  final _descricaoCtrl = TextEditingController(
+    text: defaultStudySessionDescription,
+  );
   final _diasSelecionados = List.generate(7, (_) => false);
   final _sessoesGeradas = <DateTime>[];
   final _duracoes = <int>[];
@@ -25,6 +27,8 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
   String _cor = '6', _visibilidade = 'default';
   int _alertaMinutos = 10;
   String _agendaId = 'primary';
+
+  final _diasSemana = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
   Future<void> _gerarSessoes() async {
     final hoje = DateTime.now();
@@ -39,10 +43,15 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
     for (int semana = 0; semana < _semanas; semana++) {
       for (int i = 0; i < 7; i++) {
         if (_diasSelecionados[i]) {
-          final dia = hoje.add(Duration(days: i + semana * 7));
+          final hojeWeekday = hoje.weekday; // 1 = segunda
+          final offset = (i + 1 - hojeWeekday + 7) % 7;
+          final dia = hoje.add(Duration(days: offset + semana * 7));
+
           final inicioMin = _inicio.hour * 60 + _inicio.minute;
           final fimMin = _fim.hour * 60 + _fim.minute;
           final duracao = fimMin - inicioMin;
+          if (duracao <= 0) continue;
+
           final hora = inicioMin ~/ 60, minuto = inicioMin % 60;
           final inicio = DateTime(dia.year, dia.month, dia.day, hora, minuto);
           final fim = inicio.add(Duration(minutes: duracao));
@@ -55,10 +64,18 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
 
           if (eventosExistentes.isNotEmpty) {
             final ev = eventosExistentes.first;
-            final evInicio = DateFormat('HH:mm').format(ev.start!.dateTime!.toLocal());
-            final evFim = DateFormat('HH:mm').format(ev.end!.dateTime!.toLocal());
+            final evInicio = DateFormat(
+              'HH:mm',
+            ).format(ev.start!.dateTime!.toLocal());
+            final evFim = DateFormat(
+              'HH:mm',
+            ).format(ev.end!.dateTime!.toLocal());
             final titulo = ev.summary ?? '(Sem título)';
-            novosConflitos.add('⚠️ ${DateFormat('dd/MM HH:mm').format(inicio)} conflita com "$titulo" ($evInicio–$evFim)');
+            novosConflitos.add(
+              '⚠️ ${DateFormat('dd/MM HH:mm').format(inicio)} conflita com "$titulo" ($evInicio–$evFim)',
+            );
+          } else {
+            novosConflitos.add('');
           }
 
           novasSessoes.add(inicio);
@@ -86,8 +103,47 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
     });
   }
 
+  Widget _buildListaSessoes() {
+    final dateFmt = DateFormat('dd/MM');
+    final timeFmt = DateFormat('HH:mm');
+
+    if (_sessoesGeradas.isEmpty) return const Text('Nenhuma seção gerada.');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Seções geradas:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        ..._sessoesGeradas.asMap().entries.map((entry) {
+          final i = entry.key;
+          final inicio = entry.value;
+          final fim = inicio.add(Duration(minutes: _duracoes[i]));
+          final conflito = _conflitos[i];
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              conflito.isNotEmpty
+                  ? conflito
+                  : '${dateFmt.format(inicio)} • ${timeFmt.format(inicio)}–${timeFmt.format(fim)} (${_duracoes[i]} min)',
+              style: TextStyle(
+                fontSize: 14,
+                color: conflito.isNotEmpty ? Colors.red : Colors.black,
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Future<void> _salvarSessoes() async {
-    if (_conflitos.isNotEmpty) {
+    final temConflito = _conflitos.any((c) => c.isNotEmpty);
+
+    if (temConflito) {
       final continuar = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
@@ -97,12 +153,20 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
             children: [
               const Text('Há sessões que conflitam com eventos existentes:'),
               const SizedBox(height: 8),
-              ..._conflitos.map((c) => Text(c, style: const TextStyle(fontSize: 13))),
+              ..._conflitos
+                  .where((c) => c.isNotEmpty)
+                  .map((c) => Text(c, style: const TextStyle(fontSize: 13))),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Verificar')),
-            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continuar')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Verificar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Continuar'),
+            ),
           ],
         ),
       );
@@ -110,7 +174,13 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
     }
 
     final token = await AuthService().getGoogleAccessToken();
-    if (token == null) return;
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao autenticar Google')),
+      );
+      return;
+    }
+
     final service = GoogleCalendarService(token);
 
     for (int i = 0; i < _sessoesGeradas.length; i++) {
@@ -129,34 +199,8 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
       );
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sessões salvas com sucesso!')));
-  }
-
-  Widget _buildListaSessoes() {
-    final dateFmt = DateFormat('dd/MM');
-    final timeFmt = DateFormat('HH:mm');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Seções geradas:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ..._sessoesGeradas.asMap().entries.map((entry) {
-          final i = entry.key;
-          final inicio = entry.value;
-          final fim = inicio.add(Duration(minutes: _duracoes[i]));
-          final conflito = _conflitos.length > i ? _conflitos[i] : null;
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              conflito ??
-                  '${dateFmt.format(inicio)} • ${timeFmt.format(inicio)}–${timeFmt.format(fim)} (${_duracoes[i]} min)',
-              style: TextStyle(fontSize: 14, color: conflito != null ? Colors.red : Colors.black),
-            ),
-          );
-        }),
-      ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Sessões salvas com sucesso!')),
     );
   }
 
@@ -164,17 +208,112 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Criar Agenda de Estudos')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(controller: _tituloCtrl, decoration: const InputDecoration(labelText: 'Título')),
-            TextField(controller: _descricaoCtrl, decoration: const InputDecoration(labelText: 'Descrição')),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: _gerarSessoes, child: const Text('Gerar Seções')),
-            const SizedBox(height: 12),
-            Expanded(child: SingleChildScrollView(child: _buildListaSessoes())),
-            ElevatedButton(onPressed: _salvarSessoes, child: const Text('Salvar Sessões')),
+            TextField(
+              controller: _tituloCtrl,
+              decoration: const InputDecoration(labelText: 'Título'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descricaoCtrl,
+              decoration: const InputDecoration(labelText: 'Descrição'),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              children: List.generate(7, (i) {
+                return FilterChip(
+                  label: Text(_diasSemana[i]),
+                  selected: _diasSelecionados[i],
+                  onSelected: (v) => setState(() => _diasSelecionados[i] = v),
+                );
+              }),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: _inicio,
+                    );
+                    if (picked != null) setState(() => _inicio = picked);
+                  },
+                  child: Text('Início: ${_inicio.format(context)}'),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: _fim,
+                    );
+                    if (picked != null) setState(() => _fim = picked);
+                  },
+                  child: Text('Fim: ${_fim.format(context)}'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text('Semanas:'),
+                const SizedBox(width: 8),
+                DropdownButton<int>(
+                  value: _semanas,
+                  items: List.generate(
+                    6,
+                    (i) =>
+                        DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+                  ),
+                  onChanged: (v) => setState(() => _semanas = v!),
+                ),
+                const Spacer(),
+                Checkbox(
+                  value: _manterSessoes,
+                  onChanged: (v) => setState(() => _manterSessoes = v!),
+                ),
+                const Text('Manter sessões anteriores'),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Botões de ação
+            Row(
+              children: [
+                ElevatedButton(
+                  onPressed: _gerarSessoes,
+                  child: const Text('Gerar Seções'),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: () => setState(() {
+                    _sessoesGeradas.clear();
+                    _duracoes.clear();
+                    _conflitos.clear();
+                  }),
+                  child: const Text('Limpar Seções'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Lista de sessões geradas
+            _buildListaSessoes(),
+
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _salvarSessoes,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+              ),
+              child: const Text('Salvar Sessões'),
+            ),
           ],
         ),
       ),

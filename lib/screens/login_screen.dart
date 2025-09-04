@@ -7,7 +7,7 @@ import 'package:studyflow/screens/welcome_screen.dart';
 import 'package:studyflow/screens/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({Key? key}) : super(key: key);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -65,16 +65,16 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => primeiroLogin
-            ? WelcomeScreen(user: user)
-            : const HomeScreen(),
+        builder: (_) =>
+            primeiroLogin ? WelcomeScreen(user: user) : const HomeScreen(),
       ),
     );
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -140,8 +140,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child:
-                          const Text('Entrar', style: TextStyle(fontSize: 16)),
+                      child: const Text(
+                        'Entrar',
+                        style: TextStyle(fontSize: 16),
+                      ),
                     ),
                     const SizedBox(height: 12),
 

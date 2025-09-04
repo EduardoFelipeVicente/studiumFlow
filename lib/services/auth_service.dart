@@ -10,13 +10,13 @@ class AuthService {
 
   // ----- ATENÇÃO: use aqui o Client ID do tipo WEB -----
   static const _webClientId =
-    '109345613312-80fvn4s8sk24f047ndnnqrcv7oitf8p3.apps.googleusercontent.com';
+      '109345613312-80fvn4s8sk24f047ndnnqrcv7oitf8p3.apps.googleusercontent.com';
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     serverClientId: _webClientId,
     scopes: [
       'email',
-      calendar.CalendarApi.calendarScope,
+      calendar.CalendarApi.calendarScope, // https://www.googleapis.com/auth/calendar
     ],
   );
 
@@ -40,26 +40,9 @@ class AuthService {
     }
   }
 
-  /// Login com email/senha e retorno do usuário Firebase
-  Future<User?> signInWithEmail(String email, String senha) async {
-    try {
-      final cred = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: senha,
-      );
-      return cred.user;
-    } catch (e) {
-      print('Erro ao fazer login com email: $e');
-      return null;
-    }
-  }
-
   /// Cria ou atualiza documento do usuário no Firestore
   Future<void> criarOuAtualizarUsuario(User user) async {
-    final docRef = FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(user.uid);
-
+    final docRef = FirebaseFirestore.instance.collection('usuarios').doc(user.uid);
     final doc = await docRef.get();
     if (!doc.exists) {
       await docRef.set({
@@ -73,24 +56,20 @@ class AuthService {
     }
   }
 
-  /// Retorna true se for o primeiro login (e já atualiza flags no Firestore)
+  /// Retorna true se for o primeiro login (e já atualiza as flags no Firestore)
   Future<bool> isPrimeiroLogin(User user) async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(user.uid)
-          .get();
+      final docRef = FirebaseFirestore.instance.collection('usuarios').doc(user.uid);
+      final snapshot = await docRef.get();
       final dados = snapshot.data();
-
       if (dados == null) return false;
+
       final primeiro = dados['primeiroLogin'] ?? false;
-      final manual = dados['loginManual'] ?? false;
+      final manual  = dados['loginManual']   ?? false;
 
       if (primeiro && manual) {
-        await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(user.uid)
-            .update({
+        // após detectar o primeiro login, zera as flags
+        await docRef.update({
           'primeiroLogin': false,
           'loginManual': false,
         });
@@ -109,15 +88,16 @@ class AuthService {
     await _auth.signOut();
   }
 
-  /// Retorna o accessToken do Google (para uso no CalendarService)
-  Future<String?> getGoogleAccessToken() async {
-    GoogleSignInAccount? googleUser =
-        await _googleSignIn.signInSilently();
-    if (googleUser == null) {
-      googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
-    }
-    final googleAuth = await googleUser.authentication;
-    return googleAuth.accessToken;
+  /// Retorna os headers de Authorization para chamadas REST (ou null se não autenticou)
+  Future<Map<String, String>?> getAuthHeaders() async {
+    GoogleSignInAccount? user = await _googleSignIn.signInSilently();
+    user ??= await _googleSignIn.signIn();
+    if (user == null) return null;
+
+    final auth = await user.authentication;
+    return {
+      'Authorization': 'Bearer ${auth.accessToken}',
+      'Content-Type': 'application/json',
+    };
   }
 }

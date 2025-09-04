@@ -1,189 +1,69 @@
-// lib/screens/calendar_screen.dart
-
 import 'package:flutter/material.dart';
-import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
-import 'package:intl/intl.dart';
-import 'package:studyflow/components/side_menu.dart';
-import 'package:studyflow/services/auth_service.dart';
-import 'package:studyflow/services/google_calendar_service.dart';
-import 'package:studyflow/services/constants.dart';
+import '../services/google_calendar_service.dart';
+import '../services/auth_service.dart';
+import '../services/constants.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
-
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  final _authService = AuthService();
-  CalendarView _currentView = CalendarView.month;
-  bool _isLoading = true;
+  late GoogleCalendarService _calendarService;
   List<Appointment> _appointments = [];
+  CalendarView _view = CalendarView.week;
 
   @override
   void initState() {
     super.initState();
-    _loadAppointments();
+    _initCalendar();
   }
 
-  Future<void> _loadAppointments() async {
-    setState(() => _isLoading = true);
-
-    final token = await _authService.getGoogleAccessToken();
-    if (token == null) {
-      _showError('Não foi possível obter token do Google');
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      final service = GoogleCalendarService(token);
-      final events = await service.fetchAppointments();
-      setState(() => _appointments = events);
-    } catch (e) {
-      _showError('Erro carregando eventos: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  void _changeView(CalendarView view) {
-    setState(() => _currentView = view);
-    _loadAppointments();
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  Future<void> _confirmDelete(Appointment appt) async {
-    final token = await _authService.getGoogleAccessToken();
-    if (token == null || appt.id == null) {
-      _showError('Não foi possível excluir a sessão.');
-      return;
-    }
-    final service = GoogleCalendarService(token);
-    await service.deleteSession(appt.id as String);
+  Future<void> _initCalendar() async {
+    final token = await AuthService().getGoogleAccessToken();
+    if (token == null) return;
+    _calendarService = GoogleCalendarService(token);
     await _loadAppointments();
   }
 
-  void _openEditDialog(Appointment appt) {
-    final titleCtrl = TextEditingController(text: appt.subject);
-    DateTime newStart = appt.startTime;
-    DateTime newEnd = appt.endTime;
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Editar Sessão'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleCtrl,
-              decoration: const InputDecoration(labelText: 'Título'),
+  Future<void> _loadAppointments() async {
+    final events = await _calendarService.fetchAllEvents();
+    setState(() {
+      _appointments = events
+          .map(
+            (e) => Appointment(
+              startTime: e.start!.dateTime!.toLocal(),
+              endTime: e.end!.dateTime!.toLocal(),
+              subject: e.summary ?? '',
+              notes: e.description,
+              id: e.id,
+              color: eventColorMap[e.colorId] ?? Colors.deepPurple,
             ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () async {
-                final pickedDate = await showDatePicker(
-                  context: context,
-                  initialDate: newStart,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2100),
-                );
-                if (pickedDate == null) return;
-                final pickedTime = await showTimePicker(
-                  context: context,
-                  initialTime: TimeOfDay.fromDateTime(newStart),
-                );
-                if (pickedTime == null) return;
-                newStart = DateTime(
-                  pickedDate.year,
-                  pickedDate.month,
-                  pickedDate.day,
-                  pickedTime.hour,
-                  pickedTime.minute,
-                );
-              },
-              child: const Text('Alterar Início'),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () async {
-                final pickedDate = await showDatePicker(
-                  context: context,
-                  initialDate: newEnd,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2100),
-                );
-                if (pickedDate == null) return;
-                final pickedTime = await showTimePicker(
-                  context: context,
-                  initialTime: TimeOfDay.fromDateTime(newEnd),
-                );
-                if (pickedTime == null) return;
-                newEnd = DateTime(
-                  pickedDate.year,
-                  pickedDate.month,
-                  pickedDate.day,
-                  pickedTime.hour,
-                  pickedTime.minute,
-                );
-              },
-              child: const Text('Alterar Fim'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final token = await _authService.getGoogleAccessToken();
-              if (token == null || appt.id == null) {
-                _showError('Não foi possível editar a sessão.');
-                return;
-              }
-              final service = GoogleCalendarService(token);
-              await service.updateSession(
-                eventId: appt.id as String,
-                newStart: newStart,
-                newEnd: newEnd,
-                newSummary: titleCtrl.text.trim(),
-                newDescription: appt.notes,
-              );
-              await _loadAppointments();
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
+          )
+          .toList();
+    });
   }
 
-  void _showAppointmentDetails(Appointment appt) {
-    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+  void _onTap(CalendarTapDetails details) {
+    final appt = details.appointments?.firstOrNull;
+    if (appt != null)
+      _showDetailsDialog(appt);
+    else
+      _openEventDialog(details.date!);
+  }
+
+  void _showDetailsDialog(Appointment appt) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: Text(appt.subject),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Início: ${dateFmt.format(appt.startTime)}'),
-            Text('Fim:    ${dateFmt.format(appt.endTime)}'),
-            if (appt.notes != null) ...[
-              const SizedBox(height: 8),
-              const Text('Descrição:'),
-              Text(appt.notes!),
-            ],
+            Text('${appt.startTime} – ${appt.endTime}'),
+            if (appt.notes != null) Text(appt.notes!),
           ],
         ),
         actions: [
@@ -192,83 +72,132 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: const Text('Fechar'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _openEditDialog(appt);
-            },
+            onPressed: () => _openEventDialog(appt.startTime, appt: appt),
             child: const Text('Editar'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _confirmDelete(appt);
-            },
-            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            onPressed: () => _deleteEvent(appt),
+            child: const Text('Excluir'),
           ),
         ],
       ),
     );
   }
 
-  void _onCalendarTap(CalendarTapDetails details) {
-    final appts = details.appointments;
-    if (appts != null && appts.isNotEmpty) {
-      final Appointment appt = appts.first as Appointment;
-      _showAppointmentDetails(appt);
-    } else if (details.targetElement == CalendarElement.calendarCell ||
-        details.targetElement == CalendarElement.viewHeader) {
-      _openAddDialog(details.date!);
-    }
+  Future<void> _deleteEvent(Appointment appt) async {
+    Navigator.pop(context);
+    await _calendarService.deleteEvent(appt.id as String);
+    await _loadAppointments();
   }
 
-  void _openAddDialog(DateTime initialDate, {calendar.Event? existingEvent}) {
-    final titleCtrl = TextEditingController(text: existingEvent?.summary ?? '');
-    final descriptionCtrl = TextEditingController(
-      text: existingEvent?.description ?? '',
-    );
-    DateTime newStart =
-        existingEvent?.start?.dateTime?.toLocal() ?? initialDate;
-    DateTime newEnd =
-        existingEvent?.end?.dateTime?.toLocal() ??
-        initialDate.add(const Duration(hours: 1));
-    String selectedColor = existingEvent?.colorId ?? '6';
-    String selectedVisibility = existingEvent?.visibility ?? 'default';
+  void _openEventDialog(DateTime initialDate, {Appointment? appt}) async {
+    final titleCtrl = TextEditingController(text: appt?.subject ?? '');
+    final descCtrl = TextEditingController(text: appt?.notes ?? '');
+    DateTime start = appt?.startTime ?? initialDate;
+    DateTime end = appt?.endTime ?? initialDate.add(const Duration(hours: 1));
+    String colorId = eventColorMap.entries
+        .firstWhere(
+          (e) => e.value == appt?.color,
+          orElse: () => const MapEntry('6', Colors.deepPurple),
+        )
+        .key;
 
-    final dateFmt = DateFormat('dd/MM/yyyy');
-    final timeFmt = DateFormat('HH:mm');
+    int typeIndex = 4;
+    int statusIndex = 1;
+
+    if (appt != null && appt.id is String) {
+      final props = await _calendarService.getEventExtendedProperties(
+        appt.id as String,
+      );
+      typeIndex = typeSection.entries
+          .firstWhere(
+            (e) => e.value == props['type'],
+            orElse: () => const MapEntry(4, 'Outros'),
+          )
+          .key;
+      statusIndex = statusSection.entries
+          .firstWhere(
+            (e) => e.value == props['status'],
+            orElse: () => const MapEntry(1, 'Agendado'),
+          )
+          .key;
+    }
 
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: Text(existingEvent == null ? 'Novo Evento' : 'Editar Evento'),
+          title: Text(appt == null ? 'Novo Evento' : 'Editar Evento'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Título
                 TextField(
                   controller: titleCtrl,
                   decoration: const InputDecoration(labelText: 'Título'),
                 ),
-                const SizedBox(height: 12),
-
-                // Descrição
                 TextField(
-                  controller: descriptionCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Descrição (opcional)',
-                  ),
-                  maxLines: 2,
+                  controller: descCtrl,
+                  decoration: const InputDecoration(labelText: 'Descrição'),
                 ),
-                const SizedBox(height: 12),
-
-                // Cor do Evento
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: start,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked == null) return;
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(start),
+                    );
+                    if (time == null) return;
+                    setState(
+                      () => start = DateTime(
+                        picked.year,
+                        picked.month,
+                        picked.day,
+                        time.hour,
+                        time.minute,
+                      ),
+                    );
+                  },
+                  child: Text('Início: ${start.toLocal()}'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: end,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked == null) return;
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(end),
+                    );
+                    if (time == null) return;
+                    setState(
+                      () => end = DateTime(
+                        picked.year,
+                        picked.month,
+                        picked.day,
+                        time.hour,
+                        time.minute,
+                      ),
+                    );
+                  },
+                  child: Text('Fim: ${end.toLocal()}'),
+                ),
                 DropdownButtonFormField<String>(
-                  value: selectedColor,
-                  decoration: const InputDecoration(labelText: 'Cor do Evento'),
+                  value: colorId,
+                  decoration: const InputDecoration(labelText: 'Cor'),
                   items: eventColorNames.keys.map((id) {
-                    return DropdownMenuItem<String>(
+                    return DropdownMenuItem(
                       value: id,
                       child: Row(
                         children: [
@@ -286,83 +215,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                     );
                   }).toList(),
-                  onChanged: (v) => setState(() => selectedColor = v!),
+                  onChanged: (v) => setState(() => colorId = v!),
                 ),
-                const SizedBox(height: 12),
-
-                // Visibilidade
-                DropdownButtonFormField<String>(
-                  value: selectedVisibility,
-                  decoration: const InputDecoration(labelText: 'Visibilidade'),
-                  items: const [
-                    DropdownMenuItem(value: 'default', child: Text('Padrão')),
-                    DropdownMenuItem(value: 'private', child: Text('Privado')),
-                    DropdownMenuItem(value: 'public', child: Text('Público')),
-                  ],
-                  onChanged: (v) => setState(() => selectedVisibility = v!),
-                ),
-                const SizedBox(height: 12),
-
-                // Início
-                ElevatedButton(
-                  onPressed: () async {
-                    final pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: newStart,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (pickedDate == null) return;
-                    final pickedTime = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(newStart),
-                    );
-                    if (pickedTime == null) return;
-                    setState(() {
-                      newStart = DateTime(
-                        pickedDate.year,
-                        pickedDate.month,
-                        pickedDate.day,
-                        pickedTime.hour,
-                        pickedTime.minute,
-                      );
-                      newEnd = newStart.add(const Duration(hours: 1));
-                    });
-                  },
-                  child: Text(
-                    'Início: ${dateFmt.format(newStart)} ${timeFmt.format(newStart)}',
+                DropdownButtonFormField<int>(
+                  value: typeIndex,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo da Sessão',
                   ),
+                  items: typeSection.entries
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => typeIndex = v!),
                 ),
-                const SizedBox(height: 12),
-
-                // Fim
-                ElevatedButton(
-                  onPressed: () async {
-                    final pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: newEnd,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (pickedDate == null) return;
-                    final pickedTime = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(newEnd),
-                    );
-                    if (pickedTime == null) return;
-                    setState(() {
-                      newEnd = DateTime(
-                        pickedDate.year,
-                        pickedDate.month,
-                        pickedDate.day,
-                        pickedTime.hour,
-                        pickedTime.minute,
-                      );
-                    });
-                  },
-                  child: Text(
-                    'Fim:    ${dateFmt.format(newEnd)} ${timeFmt.format(newEnd)}',
-                  ),
+                DropdownButtonFormField<int>(
+                  value: statusIndex,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: statusSection.entries
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => statusIndex = v!),
                 ),
               ],
             ),
@@ -375,40 +256,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
             TextButton(
               onPressed: () async {
                 Navigator.pop(context);
-                final token = await _authService.getGoogleAccessToken();
-                if (token == null) {
-                  _showError('Não foi possível obter token.');
-                  return;
-                }
-                final service = GoogleCalendarService(token);
-
-                final titulo = titleCtrl.text.trim();
-                final descricao = descriptionCtrl.text.trim();
-                final duracaoMinutos = newEnd.difference(newStart).inMinutes;
-
-                if (existingEvent == null) {
-                  await service.insertEventOnCalendar(
-                    start: newStart,
-                    duracaoMinutos: duracaoMinutos,
-                    titulo: titulo,
-                    descricao: descricao,
-                    sectionTypeIndex: 0,
-                    statusSectionIndex: 0,
+                if (appt == null) {
+                  await _calendarService.insertEventOnCalendar(
+                    start: start,
+                    duracaoMinutos: end.difference(start).inMinutes,
+                    titulo: titleCtrl.text.trim(),
+                    descricao: descCtrl.text.trim(),
+                    sectionTypeIndex: typeIndex,
+                    statusSectionIndex: statusIndex,
                     calendarId: 'primary',
-                    alertaMinutos: 10,
-                    colorId: selectedColor,
-                    transparency: 'opaque',
-                    visibility: selectedVisibility,
+                    colorId: colorId,
                   );
                 } else {
-                  await service.alterEventOnCalendar(
-                    eventId: existingEvent.id!,
+                  await _calendarService.alterEventOnCalendar(
+                    eventId: appt.id as String,
                     calendarId: 'primary',
-                    novaDescricao: descricao,
-                    statusSectionIndex: 0,
+                    novaDescricao: descCtrl.text.trim(),
+                    statusSectionIndex: statusIndex,
                   );
                 }
-
                 await _loadAppointments();
               },
               child: const Text('Salvar'),
@@ -423,98 +289,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Calendário de Estudos'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text('Agenda'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_today),
-            tooltip: 'Mês',
-            onPressed: () => _changeView(CalendarView.month),
+            icon: const Icon(Icons.calendar_view_day),
+            onPressed: () => setState(() => _view = CalendarView.day),
           ),
           IconButton(
             icon: const Icon(Icons.view_week),
-            tooltip: 'Semana',
-            onPressed: () => _changeView(CalendarView.week),
+            onPressed: () => setState(() => _view = CalendarView.week),
           ),
           IconButton(
-            icon: const Icon(Icons.view_day),
-            tooltip: 'Dia',
-            onPressed: () => _changeView(CalendarView.day),
-          ),
-          IconButton(
-            icon: const Icon(Icons.list),
-            tooltip: 'Próximos eventos',
-            onPressed: () {
-              final now = DateTime.now();
-              final upcoming =
-                  _appointments.where((a) => a.startTime.isAfter(now)).toList()
-                    ..sort((a, b) => a.startTime.compareTo(b.startTime));
-              showModalBottomSheet(
-                context: context,
-                builder: (_) => ListView.builder(
-                  itemCount: upcoming.length,
-                  itemBuilder: (ctx, i) {
-                    final e = upcoming[i];
-                    final fmt = DateFormat('dd/MM HH:mm');
-                    return ListTile(
-                      title: Text(e.subject),
-                      subtitle: Text(
-                        '${fmt.format(e.startTime)} → ${fmt.format(e.endTime)}',
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Recarregar',
-            onPressed: _loadAppointments,
+            icon: const Icon(Icons.calendar_month),
+            onPressed: () => setState(() => _view = CalendarView.month),
           ),
         ],
       ),
-      drawer: const SideMenu(),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => _changeView(CalendarView.day),
-                  child: const Text('Dia'),
-                ),
-                TextButton(
-                  onPressed: () => _changeView(CalendarView.week),
-                  child: const Text('Semana'),
-                ),
-                TextButton(
-                  onPressed: () => _changeView(CalendarView.month),
-                  child: const Text('Mês'),
-                ),
-              ],
-            ),
-          ),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : SfCalendar(
-                    view: _currentView,
-                    firstDayOfWeek: 1,
-                    dataSource: MeetingDataSource(_appointments),
-                    appointmentTextStyle: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    monthViewSettings: const MonthViewSettings(
-                      appointmentDisplayMode:
-                          MonthAppointmentDisplayMode.appointment,
-                    ),
-                    onTap: _onCalendarTap,
-                  ),
+            child: SfCalendar(
+              view: _view,
+              dataSource: AppointmentDataSource(_appointments),
+              onTap: _onTap,
+              initialDisplayDate: DateTime.now(),
+            ),
           ),
         ],
       ),
@@ -522,8 +321,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 }
 
-class MeetingDataSource extends CalendarDataSource {
-  MeetingDataSource(List<Appointment> source) {
+class AppointmentDataSource extends CalendarDataSource {
+  AppointmentDataSource(List<Appointment> source) {
     appointments = source;
   }
 }
