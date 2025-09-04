@@ -36,7 +36,7 @@ class SideMenu extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const StudyScheduleChart()),
+                MaterialPageRoute(builder: (_) => const StudyScheduleScreen()),
               );
             },
           ),

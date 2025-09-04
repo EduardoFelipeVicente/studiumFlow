@@ -1,6 +1,7 @@
 // lib/screens/calendar_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:studyflow/components/side_menu.dart';
@@ -220,13 +221,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  void _openAddDialog(DateTime initialDate) {
-    final titleCtrl = TextEditingController();
-    final descriptionCtrl = TextEditingController();
-    DateTime newStart = initialDate;
-    DateTime newEnd = initialDate.add(const Duration(hours: 1));
-    String selectedColor = '6';
-    String selectedVisibility = 'default';
+  void _openAddDialog(DateTime initialDate, {calendar.Event? existingEvent}) {
+    final titleCtrl = TextEditingController(text: existingEvent?.summary ?? '');
+    final descriptionCtrl = TextEditingController(
+      text: existingEvent?.description ?? '',
+    );
+    DateTime newStart =
+        existingEvent?.start?.dateTime?.toLocal() ?? initialDate;
+    DateTime newEnd =
+        existingEvent?.end?.dateTime?.toLocal() ??
+        initialDate.add(const Duration(hours: 1));
+    String selectedColor = existingEvent?.colorId ?? '6';
+    String selectedVisibility = existingEvent?.visibility ?? 'default';
 
     final dateFmt = DateFormat('dd/MM/yyyy');
     final timeFmt = DateFormat('HH:mm');
@@ -235,7 +241,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: const Text('Novo Evento'),
+          title: Text(existingEvent == null ? 'Novo Evento' : 'Editar Evento'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -245,7 +251,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   controller: titleCtrl,
                   decoration: const InputDecoration(labelText: 'Título'),
                 ),
-
                 const SizedBox(height: 12),
 
                 // Descrição
@@ -256,12 +261,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                   maxLines: 2,
                 ),
-
                 const SizedBox(height: 12),
 
                 // Cor do Evento
                 DropdownButtonFormField<String>(
-                  initialValue: selectedColor,
+                  value: selectedColor,
                   decoration: const InputDecoration(labelText: 'Cor do Evento'),
                   items: eventColorNames.keys.map((id) {
                     return DropdownMenuItem<String>(
@@ -284,12 +288,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   }).toList(),
                   onChanged: (v) => setState(() => selectedColor = v!),
                 ),
-
                 const SizedBox(height: 12),
 
                 // Visibilidade
                 DropdownButtonFormField<String>(
-                  initialValue: selectedVisibility,
+                  value: selectedVisibility,
                   decoration: const InputDecoration(labelText: 'Visibilidade'),
                   items: const [
                     DropdownMenuItem(value: 'default', child: Text('Padrão')),
@@ -298,7 +301,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ],
                   onChanged: (v) => setState(() => selectedVisibility = v!),
                 ),
-
                 const SizedBox(height: 12),
 
                 // Início
@@ -331,7 +333,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     'Início: ${dateFmt.format(newStart)} ${timeFmt.format(newStart)}',
                   ),
                 ),
-
                 const SizedBox(height: 12),
 
                 // Fim
@@ -380,19 +381,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   return;
                 }
                 final service = GoogleCalendarService(token);
-                await service.insertStudySession(
-                  start: newStart,
-                  focoMinutos: newEnd.difference(newStart).inMinutes,
-                  titulo: titleCtrl.text.trim(),
-                  descricao: descriptionCtrl.text.trim(),
-                  sectionTypeIndex: 0,
-                  statusSectionIndex: 0,
-                  calendarId: 'primary',
-                  alertaMinutos: 10,
-                  colorId: selectedColor,
-                  transparency: 'opaque',
-                  visibility: selectedVisibility,
-                );
+
+                final titulo = titleCtrl.text.trim();
+                final descricao = descriptionCtrl.text.trim();
+                final duracaoMinutos = newEnd.difference(newStart).inMinutes;
+
+                if (existingEvent == null) {
+                  await service.insertEventOnCalendar(
+                    start: newStart,
+                    duracaoMinutos: duracaoMinutos,
+                    titulo: titulo,
+                    descricao: descricao,
+                    sectionTypeIndex: 0,
+                    statusSectionIndex: 0,
+                    calendarId: 'primary',
+                    alertaMinutos: 10,
+                    colorId: selectedColor,
+                    transparency: 'opaque',
+                    visibility: selectedVisibility,
+                  );
+                } else {
+                  await service.alterEventOnCalendar(
+                    eventId: existingEvent.id!,
+                    calendarId: 'primary',
+                    novaDescricao: descricao,
+                    statusSectionIndex: 0,
+                  );
+                }
+
                 await _loadAppointments();
               },
               child: const Text('Salvar'),

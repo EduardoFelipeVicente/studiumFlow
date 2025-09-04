@@ -84,7 +84,7 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
       drawer: const SideMenu(),
 
       appBar: AppBar(
-        title: const Text('Próximas Seções'),
+        title: const Text('Próximos Eventos'),
         backgroundColor: Colors.deepPurple,
       ),
       body: Column(
@@ -152,7 +152,7 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
 
   Widget _buildGroupedList(DateFormat dateFmt, DateFormat timeFmt) {
     if (_events.isEmpty) {
-      return const Center(child: Text('Nenhuma seção encontrada.'));
+      return const Center(child: Text('Nenhuma evento encontrado.'));
     }
     final list = _groupByDate
         ? _buildByDate(dateFmt, timeFmt)

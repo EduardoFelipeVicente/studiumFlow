@@ -76,24 +76,27 @@ class GoogleCalendarService {
     }
   }
 
-  Future<void> insertStudySession({
+  Future<void> insertEventOnCalendar({
     required DateTime start, // horário local
-    required int focoMinutos,
+    required int duracaoMinutos, // duração total da sessão
     String? titulo,
     String? descricao,
-    int? sectionTypeIndex, // índice para escolher o rótulo
-    int? statusSectionIndex,
+    int? sectionTypeIndex, // índice para tipo (ex: Estudo, Prova)
+    int? statusSectionIndex, // índice para status (ex: Agendado, Concluído)
     String calendarId = 'primary',
     int alertaMinutos = 10,
     String colorId = '6',
     String transparency = 'opaque',
     String visibility = 'default',
+    DateTime? inicioReal, // opcional: horário real de início
+    Duration? tempoFoco,
+    Duration? tempoPausa,
   }) async {
-    // 1. Extrai o rótulo baseado no índice (fallback para 'Nenhum')
+    // 1. Extrai rótulos a partir dos índices
     final sectionLabel = typeSection[sectionTypeIndex] ?? typeSection[0]!;
     final statusLabel = statusSection[statusSectionIndex] ?? statusSection[0]!;
 
-    // 2. Normaliza horário de início e fim
+    // 2. Define horário de início e fim
     final localStart = DateTime(
       start.year,
       start.month,
@@ -101,16 +104,7 @@ class GoogleCalendarService {
       start.hour,
       start.minute,
     );
-    final eventEnd = localStart.add(
-      Duration(minutes: focoMinutos),
-    );
-    final localEnd = DateTime(
-      eventEnd.year,
-      eventEnd.month,
-      eventEnd.day,
-      eventEnd.hour,
-      eventEnd.minute,
-    );
+    final localEnd = localStart.add(Duration(minutes: duracaoMinutos));
 
     // 3. Configura cliente e API
     final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
@@ -118,10 +112,29 @@ class GoogleCalendarService {
     final api = calendar.CalendarApi(client);
 
     try {
+      // 4. Monta propriedades estendidas
+      final extendedProps = {'type': sectionLabel, 'status': statusLabel};
+
+      if (inicioReal != null) {
+        extendedProps['inicioReal'] = inicioReal.toIso8601String();
+      }
+      if (tempoFoco != null) {
+        extendedProps['tempoFoco'] = tempoFoco.inMinutes.toString();
+      }
+      if (tempoPausa != null) {
+        extendedProps['tempoPausa'] = tempoPausa.inMinutes.toString();
+      }
+      if (tempoFoco != null || tempoPausa != null) {
+        final total =
+            (tempoFoco ?? Duration.zero) + (tempoPausa ?? Duration.zero);
+        extendedProps['tempoTotal'] = total.inMinutes.toString();
+      }
+
+      // 5. Cria evento
       final ev = calendar.Event()
-        // opcional: usar o label no título
         ..summary = titulo ?? '[StudyFlow] $sectionLabel'
-        ..description = descricao ?? 'Gerada automaticamente pelo StudyFlow'
+        ..description =
+            descricao ?? 'Sessão gerada automaticamente pelo StudyFlow'
         ..start = calendar.EventDateTime(
           dateTime: localStart,
           timeZone: 'America/Sao_Paulo',
@@ -140,10 +153,7 @@ class GoogleCalendarService {
           ],
         )
         ..extendedProperties = calendar.EventExtendedProperties(
-          private: {
-            'type': sectionLabel, 
-            'status' : statusLabel,// aqui o rótulo dinâmico
-          },
+          private: extendedProps,
         );
 
       await api.events.insert(ev, calendarId);
@@ -152,37 +162,108 @@ class GoogleCalendarService {
     }
   }
 
-Future<List<calendar.Event>> fetchNextStudySessions({
-  String calendarId = 'primary',
-  int maxResults = 20,
-  List<String>? privateExtendedProperties,
-}) async {
-  // 1. calcula expiry e cria client autenticado
-  final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
-  final client = _buildClient(expiryUtc: expiry);
+  Future<void> alterEventOnCalendar({
+    required String eventId,
+    String calendarId = 'primary',
+    int? statusSectionIndex,
+    DateTime? inicioReal,
+    Duration? tempoFoco,
+    Duration? tempoPausa,
+    String? novaDescricao,
+  }) async {
+    final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
+    final client = _buildClient(expiryUtc: expiry);
+    final api = calendar.CalendarApi(client);
 
-  // 2. cria a instância da API
-  final api = calendar.CalendarApi(client);
+    try {
+      // 1. Busca o evento atual
+      final original = await api.events.get(calendarId, eventId);
 
-  try {
-    // 3. faz a chamada list com o filtro em extendedProperties.private['type']
-    final now = DateTime.now().toUtc();
-    final resp = await api.events.list(
-      calendarId,
-      timeMin: now,
-      singleEvents: true,
-      orderBy: 'startTime',
-      maxResults: maxResults,
-      privateExtendedProperty: privateExtendedProperties,
-    );
+      // 2. Atualiza campos desejados
+      final updated = calendar.Event();
 
-    // 4. retorna a lista (ou vazia)
-    return resp.items ?? <calendar.Event>[];
-  } finally {
-    // 5. não esqueça de fechar o client
-    client.close();
+      // Mantém os dados existentes
+      updated.summary = original.summary;
+      updated.start = original.start;
+      updated.end = original.end;
+      updated.colorId = original.colorId;
+      updated.transparency = original.transparency;
+      updated.visibility = original.visibility;
+      updated.reminders = original.reminders;
+
+      // Atualiza descrição se fornecida
+      if (novaDescricao != null) {
+        updated.description = novaDescricao;
+      } else {
+        updated.description = original.description;
+      }
+
+      // Atualiza propriedades estendidas
+      final props = Map<String, String>.from(
+        original.extendedProperties?.private ?? {},
+      );
+
+      if (statusSectionIndex != null) {
+        props['status'] =
+            statusSection[statusSectionIndex] ?? statusSection[0]!;
+      }
+      if (inicioReal != null) {
+        props['inicioReal'] = inicioReal.toIso8601String();
+      }
+      if (tempoFoco != null) {
+        props['tempoFoco'] = tempoFoco.inMinutes.toString();
+      }
+      if (tempoPausa != null) {
+        props['tempoPausa'] = tempoPausa.inMinutes.toString();
+      }
+      if (tempoFoco != null || tempoPausa != null) {
+        final total =
+            (tempoFoco ?? Duration.zero) + (tempoPausa ?? Duration.zero);
+        props['tempoTotal'] = total.inMinutes.toString();
+      }
+
+      updated.extendedProperties = calendar.EventExtendedProperties(
+        private: props,
+      );
+
+      // 3. Envia atualização
+      await api.events.update(updated, calendarId, eventId);
+    } finally {
+      client.close();
+    }
   }
-}
+
+  Future<List<calendar.Event>> fetchNextStudySessions({
+    String calendarId = 'primary',
+    int maxResults = 20,
+    List<String>? privateExtendedProperties,
+  }) async {
+    // 1. calcula expiry e cria client autenticado
+    final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
+    final client = _buildClient(expiryUtc: expiry);
+
+    // 2. cria a instância da API
+    final api = calendar.CalendarApi(client);
+
+    try {
+      // 3. faz a chamada list com o filtro em extendedProperties.private['type']
+      final now = DateTime.now().toUtc();
+      final resp = await api.events.list(
+        calendarId,
+        timeMin: now,
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults: maxResults,
+        privateExtendedProperty: privateExtendedProperties,
+      );
+
+      // 4. retorna a lista (ou vazia)
+      return resp.items ?? <calendar.Event>[];
+    } finally {
+      // 5. não esqueça de fechar o client
+      client.close();
+    }
+  }
 
   /// Busca sessões do dia atual em diante e converte para Appointment
   Future<List<Appointment>> fetchAppointments() async {
@@ -262,6 +343,29 @@ Future<List<calendar.Event>> fetchNextStudySessions({
         );
 
       await api.events.patch(updated, 'primary', eventId);
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<List<calendar.Event>> fetchEventsBetween({
+    required DateTime start,
+    required DateTime end,
+    String calendarId = 'primary',
+  }) async {
+    final expiry = DateTime.now().toUtc().add(const Duration(hours: 1));
+    final client = _buildClient(expiryUtc: expiry);
+    final api = calendar.CalendarApi(client);
+
+    try {
+      final events = await api.events.list(
+        calendarId,
+        timeMin: start.toUtc(),
+        timeMax: end.toUtc(),
+        singleEvents: true,
+        orderBy: 'startTime',
+      );
+      return events.items ?? [];
     } finally {
       client.close();
     }
