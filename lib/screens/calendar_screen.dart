@@ -66,7 +66,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
   }
 
   void _changeView(CalendarView view) {
@@ -102,10 +104,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar')),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
@@ -140,35 +139,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
     DateTime start = appt?.startTime ?? initialDate;
     DateTime end = appt?.endTime ?? initialDate.add(const Duration(hours: 1));
     String colorId = eventColorMap.entries
-        .firstWhere(
-          (e) => e.value == appt?.color,
-          orElse: () => const MapEntry('6', Colors.deepPurple),
-        )
-        .key;
+            .firstWhere(
+              (e) => e.value == appt?.color,
+              orElse: () => const MapEntry('6', Colors.deepPurple),
+            )
+            .key;
 
     int typeIndex = 0;
     int statusIndex = 1;
 
     if (appt != null) {
       try {
-        final props = await _calendarService.getEventExtendedProperties(
-          appt.id as String,
-        );
+        final props = await _calendarService.getEventExtendedProperties(appt.id as String);
         typeIndex = typeSection.entries
-            .firstWhere(
-              (e) => e.value == props['type'],
-              orElse: () => const MapEntry(0, 'Nenhum'),
-            )
+            .firstWhere((e) => e.value == props['type'], orElse: () => const MapEntry(0, 'Nenhum'))
             .key;
         statusIndex = statusSection.entries
-            .firstWhere(
-              (e) => e.value == props['status'],
-              orElse: () => const MapEntry(1, 'Agendado'),
-            )
+            .firstWhere((e) => e.value == props['status'], orElse: () => const MapEntry(1, 'Agendado'))
             .key;
-      } catch (_) {
-        /* ignora se não encontrar */
-      }
+      } catch (_) { /* ignora se não encontrar */ }
     }
 
     showDialog(
@@ -181,16 +170,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Título
-                TextField(
-                  controller: titleCtrl,
-                  decoration: const InputDecoration(labelText: 'Título'),
-                ),
+                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
                 const SizedBox(height: 8),
                 // Descrição
-                TextField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'Descrição'),
-                ),
+                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Descrição')),
                 const SizedBox(height: 12),
                 // Início
                 ElevatedButton(
@@ -208,15 +191,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     );
                     if (t == null) return;
                     setState(() {
-                      start = DateTime(
-                        d.year,
-                        d.month,
-                        d.day,
-                        t.hour,
-                        t.minute,
-                      );
-                      if (appt == null)
-                        end = start.add(const Duration(hours: 1));
+                      start = DateTime(d.year, d.month, d.day, t.hour, t.minute);
+                      if (appt == null) end = start.add(const Duration(hours: 1));
                     });
                   },
                   child: Text('Início: ${start.toLocal()}'),
@@ -245,47 +221,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
                 const SizedBox(height: 12),
                 // Cor
-                DropdownButtonFormField<String>(
-                  value: colorId,
-                  decoration: const InputDecoration(labelText: 'Cor'),
-                  items: eventColorMap.entries.map((entry) {
-                    final id = entry.key;
-                    final color = entry.value;
-                    final name = eventColorNames[id]!;
-                    return DropdownMenuItem(
-                      value: id,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: color, // agora é um Color de verdade
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(name),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setState(() => colorId = v!),
-                ),
+DropdownButtonFormField<String>(
+  value: colorId,
+  decoration: const InputDecoration(labelText: 'Cor'),
+  items: eventColorMap.entries.map((entry) {
+    final id = entry.key;
+    final color = entry.value;
+    final name = eventColorNames[id]!;
+    return DropdownMenuItem(
+      value: id,
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,           // agora é um Color de verdade
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(name),
+        ],
+      ),
+    );
+  }).toList(),
+  onChanged: (v) => setState(() => colorId = v!),
+),
                 const SizedBox(height: 12),
                 // Tipo
                 DropdownButtonFormField<int>(
                   value: typeIndex,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo da Sessão',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Tipo da Sessão'),
                   items: typeSection.entries
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e.key,
-                          child: Text(e.value),
-                        ),
-                      )
+                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                       .toList(),
                   onChanged: (v) => setState(() => typeIndex = v!),
                 ),
@@ -295,12 +264,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   value: statusIndex,
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: statusSection.entries
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e.key,
-                          child: Text(e.value),
-                        ),
-                      )
+                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                       .toList(),
                   onChanged: (v) => setState(() => statusIndex = v!),
                 ),
@@ -308,10 +272,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             TextButton(
               onPressed: () async {
                 Navigator.pop(context);
@@ -354,22 +315,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title: const Text('Agenda'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_view_day),
-            onPressed: () => _changeView(CalendarView.day),
-          ),
-          IconButton(
-            icon: const Icon(Icons.view_week),
-            onPressed: () => _changeView(CalendarView.week),
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () => _changeView(CalendarView.month),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAppointments,
-          ),
+          IconButton(icon: const Icon(Icons.calendar_view_day), onPressed: () => _changeView(CalendarView.day)),
+          IconButton(icon: const Icon(Icons.view_week), onPressed: () => _changeView(CalendarView.week)),
+          IconButton(icon: const Icon(Icons.calendar_month), onPressed: () => _changeView(CalendarView.month)),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadAppointments),
         ],
       ),
       body: _isLoading

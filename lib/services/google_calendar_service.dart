@@ -9,7 +9,8 @@ import 'package:studyflow/services/constants.dart';
 class GoogleCalendarService {
   final calendar.CalendarApi api;
 
-  GoogleCalendarService(http.Client client) : api = calendar.CalendarApi(client);
+  GoogleCalendarService(http.Client client)
+    : api = calendar.CalendarApi(client);
 
   /// Busca e converte para Appointment todos os eventos futuros (até 1 ano à frente)
   Future<List<Appointment>> fetchAppointments() async {
@@ -51,11 +52,13 @@ class GoogleCalendarService {
     return event.extendedProperties?.private ?? {};
   }
 
-  /// Busca eventos entre [start] e [end]
+  /// Busca eventos entre [start] e [end], opcionalmente filtrando por
+  /// privateExtendedProperty (e.g. ['type=Seção Estudo', 'status=Agendado']).
   Future<List<calendar.Event>> fetchEventsBetween({
     required DateTime start,
     required DateTime end,
     String calendarId = 'primary',
+    List<String>? privateExtendedProperty,
   }) async {
     final resp = await api.events.list(
       calendarId,
@@ -63,6 +66,8 @@ class GoogleCalendarService {
       timeMax: end.toUtc(),
       singleEvents: true,
       orderBy: 'startTime',
+      // adiciona filtros de extendedProperties se houver
+      privateExtendedProperty: privateExtendedProperty,
     );
     return resp.items ?? [];
   }
@@ -103,21 +108,25 @@ class GoogleCalendarService {
     final statusLabel = statusSection[statusSectionIndex] ?? statusSection[0]!;
 
     final ev = calendar.Event()
-      ..summary     = titulo    ?? '[StudyFlow] $sectionLabel'
+      ..summary = titulo ?? '[StudyFlow] $sectionLabel'
       ..description = descricao ?? 'Sessão gerada automaticamente'
-      ..start       = calendar.EventDateTime(dateTime: start.toUtc(), timeZone: 'UTC')
-      ..end         = calendar.EventDateTime(dateTime: start.add(Duration(minutes: duracaoMinutos)).toUtc(), timeZone: 'UTC')
-      ..colorId     = colorId
-      ..transparency= transparency
-      ..visibility  = visibility
-      ..reminders   = calendar.EventReminders(
-         useDefault: false,
-         overrides: [calendar.EventReminder(method: 'popup', minutes: alertaMinutos)],
-       )
-      ..extendedProperties = calendar.EventExtendedProperties(private: {
-        'type':   sectionLabel,
-        'status': statusLabel,
-      });
+      ..start = calendar.EventDateTime(dateTime: start.toUtc(), timeZone: 'UTC')
+      ..end = calendar.EventDateTime(
+        dateTime: start.add(Duration(minutes: duracaoMinutos)).toUtc(),
+        timeZone: 'UTC',
+      )
+      ..colorId = colorId
+      ..transparency = transparency
+      ..visibility = visibility
+      ..reminders = calendar.EventReminders(
+        useDefault: false,
+        overrides: [
+          calendar.EventReminder(method: 'popup', minutes: alertaMinutos),
+        ],
+      )
+      ..extendedProperties = calendar.EventExtendedProperties(
+        private: {'type': sectionLabel, 'status': statusLabel},
+      );
 
     await api.events.insert(ev, calendarId);
   }
@@ -133,21 +142,25 @@ class GoogleCalendarService {
     final updated = calendar.Event();
 
     // mantêm todos os campos originais, só altera description e status
-    updated.summary     = original.summary;
-    updated.start       = original.start;
-    updated.end         = original.end;
-    updated.colorId     = original.colorId;
-    updated.transparency= original.transparency;
-    updated.visibility  = original.visibility;
-    updated.reminders   = original.reminders;
+    updated.summary = original.summary;
+    updated.start = original.start;
+    updated.end = original.end;
+    updated.colorId = original.colorId;
+    updated.transparency = original.transparency;
+    updated.visibility = original.visibility;
+    updated.reminders = original.reminders;
     updated.description = novaDescricao ?? original.description;
 
     // atualiza status em extendedProperties.private
-    final props = Map<String, String>.from(original.extendedProperties?.private ?? {});
+    final props = Map<String, String>.from(
+      original.extendedProperties?.private ?? {},
+    );
     if (statusSectionIndex != null) {
       props['status'] = statusSection[statusSectionIndex] ?? statusSection[0]!;
     }
-    updated.extendedProperties = calendar.EventExtendedProperties(private: props);
+    updated.extendedProperties = calendar.EventExtendedProperties(
+      private: props,
+    );
 
     await api.events.patch(updated, calendarId, eventId);
   }
@@ -158,7 +171,9 @@ class GoogleCalendarService {
   }
 
   // Traz todos os eventos num range predefinido (30 dias atrás até 60 dias à frente)
-  Future<List<calendar.Event>> fetchAllEvents({String calendarId = 'primary'}) async {
+  Future<List<calendar.Event>> fetchAllEvents({
+    String calendarId = 'primary',
+  }) async {
     final resp = await api.events.list(
       calendarId,
       singleEvents: true,
@@ -168,5 +183,4 @@ class GoogleCalendarService {
     );
     return resp.items ?? [];
   }
-
 }
