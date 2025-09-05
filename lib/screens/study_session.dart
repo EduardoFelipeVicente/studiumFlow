@@ -1,15 +1,17 @@
 // lib/screens/study_session.dart
 
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
 
+import '../components/side_menu.dart';
 import '../services/auth_service.dart';
+import '../services/google_auth_client.dart';
 import '../services/google_calendar_service.dart';
 import '../services/constants.dart';
-import '../components/side_menu.dart';
 
 class StudySessionScreen extends StatefulWidget {
   const StudySessionScreen({Key? key}) : super(key: key);
@@ -20,7 +22,7 @@ class StudySessionScreen extends StatefulWidget {
 
 class _StudySessionScreenState extends State<StudySessionScreen> {
   final _authService = AuthService();
-  late final GoogleCalendarService _calendarService;
+  late GoogleCalendarService _calendarService;
 
   calendar.Event? _currentSession;
   bool _isLoading = true;
@@ -53,40 +55,52 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
   }
 
   Future<void> _init() async {
-    final token = await _authService.getGoogleAccessToken();
-    if (token == null) {
+    // 1) Pega headers de autenticação
+    final headers = await _authService.getAuthHeaders();
+    if (headers == null) {
       _showError('Não foi possível autenticar com o Google.');
       return;
     }
-    _calendarService = GoogleCalendarService(token);
+
+    // 2) Cria client autenticado e serviço
+    final client = GoogleAuthClient(headers);
+    _calendarService = GoogleCalendarService(client);
+
+    // 3) Carrega sessão atual
     await _checkCurrentSession();
   }
 
   Future<void> _checkCurrentSession() async {
-    final now = DateTime.now();
-    final items = await _calendarService.fetchNextStudySessions(
-      maxResults: 10,
-      privateExtendedProperties: ['type=${typeSection[1]}'],
-    );
+    try {
+      final now = DateTime.now();
+      final items = await _calendarService.fetchNextStudySessions(
+        maxResults: 10,
+        privateExtendedProperties: ['type=${typeSection[1]}'],
+      );
 
-    final current = items.firstWhereOrNull((ev) {
-      final start = ev.start?.dateTime?.toLocal();
-      final end = ev.end?.dateTime?.toLocal();
-      return start != null &&
-          end != null &&
-          now.isAfter(start) &&
-          now.isBefore(end);
-    });
+      final current = items.firstWhereOrNull((ev) {
+        final start = ev.start?.dateTime?.toLocal();
+        final end = ev.end?.dateTime?.toLocal();
+        return start != null &&
+            end != null &&
+            now.isAfter(start) &&
+            now.isBefore(end);
+      });
 
-    setState(() {
-      _currentSession = current;
-      _isLoading = false;
-    });
+      setState(() {
+        _currentSession = current;
+        _isLoading = false;
+      });
+    } catch (e) {
+      _showError('Erro ao buscar sessão atual: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
   void _startSession() {
-    _stopwatch.reset();
-    _stopwatch.start();
+    _stopwatch
+      ..reset()
+      ..start();
     _sessionStart = DateTime.now();
     setState(() => _sessionState = 'foco');
   }
@@ -142,7 +156,8 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${fmt.format(_currentSession!.start!.dateTime!.toLocal())} – ${fmt.format(_currentSession!.end!.dateTime!.toLocal())}',
+                    '${fmt.format(_currentSession!.start!.dateTime!.toLocal())}'
+                    ' – ${fmt.format(_currentSession!.end!.dateTime!.toLocal())}',
                     style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 8),

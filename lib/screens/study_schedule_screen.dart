@@ -1,322 +1,268 @@
+// lib/screens/study_schedule_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/google_calendar_service.dart';
+
 import '../services/auth_service.dart';
-import '../services/constants.dart';
+import '../services/google_auth_client.dart';
+import '../services/google_calendar_service.dart';
 
 class StudyScheduleScreen extends StatefulWidget {
-  const StudyScheduleScreen({super.key});
+  const StudyScheduleScreen({Key? key}) : super(key: key);
+
   @override
   State<StudyScheduleScreen> createState() => _StudyScheduleScreenState();
 }
 
 class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
-  final _tituloCtrl = TextEditingController(text: defaultStudySessionTitle);
-  final _descricaoCtrl = TextEditingController(
-    text: defaultStudySessionDescription,
-  );
-  final _diasSelecionados = List.generate(7, (_) => false);
-  final _sessoesGeradas = <DateTime>[];
-  final _duracoes = <int>[];
-  final _conflitos = <String>[];
+  final _authService = AuthService();
+  late final GoogleCalendarService _calendarService;
+  bool _calendarInitialized = false;
 
-  TimeOfDay _inicio = const TimeOfDay(hour: 14, minute: 0);
-  TimeOfDay _fim = const TimeOfDay(hour: 18, minute: 0);
-  int _semanas = 2;
+  // Configurações de agendamento (iniciadas com defaults)
+  int _semanas = 4;
+  TimeOfDay _inicio = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay _fim = const TimeOfDay(hour: 10, minute: 0);
+  List<bool> _diasSelecionados = List.filled(7, false);
   bool _manterSessoes = false;
-  String _cor = '6', _visibilidade = 'default';
-  int _alertaMinutos = 10;
-  String _agendaId = 'primary';
+  final String _agendaId = 'primary';
 
-  final _diasSemana = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  // Resultados
+  List<DateTime> _sessoesGeradas = [];
+  List<int> _duracoes = [];
+  List<String> _conflitos = [];
+
+  bool _isLoading = false;
+
+  static const _weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+  @override
+  void initState() {
+    super.initState();
+    _initCalendarService();
+  }
+
+  Future<void> _initCalendarService() async {
+    final headers = await _authService.getAuthHeaders();
+    if (headers == null) {
+      _showError('Não foi possível autenticar com o Google.');
+      return;
+    }
+    final client = GoogleAuthClient(headers);
+    _calendarService = GoogleCalendarService(client);
+    setState(() => _calendarInitialized = true);
+  }
+
+  Future<void> _pickStartTime() async {
+    final t = await showTimePicker(context: context, initialTime: _inicio);
+    if (t != null) setState(() => _inicio = t);
+  }
+
+  Future<void> _pickEndTime() async {
+    final t = await showTimePicker(context: context, initialTime: _fim);
+    if (t != null) setState(() => _fim = t);
+  }
 
   Future<void> _gerarSessoes() async {
-    final hoje = DateTime.now();
-    final novasSessoes = <DateTime>[];
-    final novasDuracoes = <int>[];
-    final novosConflitos = <String>[];
+    if (!_calendarInitialized) {
+      _showError('Aguarde a inicialização da agenda.');
+      return;
+    }
+    setState(() => _isLoading = true);
 
-    final token = await AuthService().getGoogleAccessToken();
-    if (token == null) return;
-    final service = GoogleCalendarService(token);
+    final hoje = DateTime.now();
+    final novas = <DateTime>[];
+    final duracoes = <int>[];
+    final conflitos = <String>[];
 
     for (int semana = 0; semana < _semanas; semana++) {
       for (int i = 0; i < 7; i++) {
-        if (_diasSelecionados[i]) {
-          final hojeWeekday = hoje.weekday; // 1 = segunda
-          final offset = (i + 1 - hojeWeekday + 7) % 7;
-          final dia = hoje.add(Duration(days: offset + semana * 7));
+        if (!_diasSelecionados[i]) continue;
 
-          final inicioMin = _inicio.hour * 60 + _inicio.minute;
-          final fimMin = _fim.hour * 60 + _fim.minute;
-          final duracao = fimMin - inicioMin;
-          if (duracao <= 0) continue;
+        final offset = (i + 1 - hoje.weekday + 7) % 7;
+        final dia = hoje.add(Duration(days: offset + semana * 7));
 
-          final hora = inicioMin ~/ 60, minuto = inicioMin % 60;
-          final inicio = DateTime(dia.year, dia.month, dia.day, hora, minuto);
-          final fim = inicio.add(Duration(minutes: duracao));
+        final inicioMin = _inicio.hour * 60 + _inicio.minute;
+        final fimMin = _fim.hour * 60 + _fim.minute;
+        final dur = fimMin - inicioMin;
+        if (dur <= 0) continue;
 
-          final eventosExistentes = await service.fetchEventsBetween(
-            start: inicio,
-            end: fim,
-            calendarId: _agendaId,
+        final start = DateTime(
+          dia.year,
+          dia.month,
+          dia.day,
+          inicioMin ~/ 60,
+          inicioMin % 60,
+        );
+        final end = start.add(Duration(minutes: dur));
+
+        final evs = await _calendarService.fetchEventsBetween(
+          start: start,
+          end: end,
+          calendarId: _agendaId,
+        );
+        if (evs.isNotEmpty) {
+          final ev = evs.first;
+          final fmt = DateFormat('dd/MM HH:mm');
+          final ini = fmt.format(ev.start!.dateTime!.toLocal());
+          final fi = fmt.format(ev.end!.dateTime!.toLocal());
+          final ttl = ev.summary ?? '(Sem título)';
+          conflitos.add(
+            '⚠️ ${fmt.format(start)} conflita com "$ttl" ($ini–$fi)',
           );
-
-          if (eventosExistentes.isNotEmpty) {
-            final ev = eventosExistentes.first;
-            final evInicio = DateFormat(
-              'HH:mm',
-            ).format(ev.start!.dateTime!.toLocal());
-            final evFim = DateFormat(
-              'HH:mm',
-            ).format(ev.end!.dateTime!.toLocal());
-            final titulo = ev.summary ?? '(Sem título)';
-            novosConflitos.add(
-              '⚠️ ${DateFormat('dd/MM HH:mm').format(inicio)} conflita com "$titulo" ($evInicio–$evFim)',
-            );
-          } else {
-            novosConflitos.add('');
-          }
-
-          novasSessoes.add(inicio);
-          novasDuracoes.add(duracao);
+        } else {
+          conflitos.add('');
         }
+
+        novas.add(start);
+        duracoes.add(dur);
       }
     }
 
     setState(() {
       if (_manterSessoes) {
-        _sessoesGeradas.addAll(novasSessoes);
-        _duracoes.addAll(novasDuracoes);
-        _conflitos.addAll(novosConflitos);
+        _sessoesGeradas.addAll(novas);
+        _duracoes.addAll(duracoes);
+        _conflitos.addAll(conflitos);
       } else {
-        _sessoesGeradas
-          ..clear()
-          ..addAll(novasSessoes);
-        _duracoes
-          ..clear()
-          ..addAll(novasDuracoes);
-        _conflitos
-          ..clear()
-          ..addAll(novosConflitos);
+        _sessoesGeradas = novas;
+        _duracoes = duracoes;
+        _conflitos = conflitos;
       }
+      _isLoading = false;
     });
   }
 
-  Widget _buildListaSessoes() {
-    final dateFmt = DateFormat('dd/MM');
-    final timeFmt = DateFormat('HH:mm');
-
-    if (_sessoesGeradas.isEmpty) return const Text('Nenhuma seção gerada.');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Seções geradas:',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        ..._sessoesGeradas.asMap().entries.map((entry) {
-          final i = entry.key;
-          final inicio = entry.value;
-          final fim = inicio.add(Duration(minutes: _duracoes[i]));
-          final conflito = _conflitos[i];
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              conflito.isNotEmpty
-                  ? conflito
-                  : '${dateFmt.format(inicio)} • ${timeFmt.format(inicio)}–${timeFmt.format(fim)} (${_duracoes[i]} min)',
-              style: TextStyle(
-                fontSize: 14,
-                color: conflito.isNotEmpty ? Colors.red : Colors.black,
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Future<void> _salvarSessoes() async {
-    final temConflito = _conflitos.any((c) => c.isNotEmpty);
-
-    if (temConflito) {
-      final continuar = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Conflitos detectados'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Há sessões que conflitam com eventos existentes:'),
-              const SizedBox(height: 8),
-              ..._conflitos
-                  .where((c) => c.isNotEmpty)
-                  .map((c) => Text(c, style: const TextStyle(fontSize: 13))),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Verificar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Continuar'),
-            ),
-          ],
-        ),
-      );
-      if (continuar != true) return;
-    }
-
-    final token = await AuthService().getGoogleAccessToken();
-    if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao autenticar Google')),
-      );
-      return;
-    }
-
-    final service = GoogleCalendarService(token);
-
-    for (int i = 0; i < _sessoesGeradas.length; i++) {
-      await service.insertEventOnCalendar(
-        start: _sessoesGeradas[i],
-        duracaoMinutos: _duracoes[i],
-        titulo: _tituloCtrl.text.trim(),
-        descricao: _descricaoCtrl.text.trim(),
-        sectionTypeIndex: 1,
-        statusSectionIndex: 1,
-        calendarId: _agendaId,
-        alertaMinutos: _alertaMinutos,
-        colorId: _cor,
-        transparency: 'opaque',
-        visibility: _visibilidade,
-      );
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sessões salvas com sucesso!')),
-    );
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final horaFmt = DateFormat.Hm();
     return Scaffold(
-      appBar: AppBar(title: const Text('Criar Agenda de Estudos')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _tituloCtrl,
-              decoration: const InputDecoration(labelText: 'Título'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _descricaoCtrl,
-              decoration: const InputDecoration(labelText: 'Descrição'),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              children: List.generate(7, (i) {
-                return FilterChip(
-                  label: Text(_diasSemana[i]),
-                  selected: _diasSelecionados[i],
-                  onSelected: (v) => setState(() => _diasSelecionados[i] = v),
-                );
-              }),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                ElevatedButton(
-                  onPressed: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: _inicio,
-                    );
-                    if (picked != null) setState(() => _inicio = picked);
-                  },
-                  child: Text('Início: ${_inicio.format(context)}'),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: _fim,
-                    );
-                    if (picked != null) setState(() => _fim = picked);
-                  },
-                  child: Text('Fim: ${_fim.format(context)}'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text('Semanas:'),
-                const SizedBox(width: 8),
-                DropdownButton<int>(
-                  value: _semanas,
-                  items: List.generate(
-                    6,
-                    (i) =>
-                        DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+      appBar: AppBar(title: const Text('Gerador de Sessões')),
+      body: !_calendarInitialized
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Número de semanas
+                  Row(
+                    children: [
+                      const Text('Semanas:'),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Slider(
+                          min: 1,
+                          max: 12,
+                          divisions: 11,
+                          label: '$_semanas',
+                          value: _semanas.toDouble(),
+                          onChanged: (v) =>
+                              setState(() => _semanas = v.toInt()),
+                        ),
+                      ),
+                      Text('$_semanas'),
+                    ],
                   ),
-                  onChanged: (v) => setState(() => _semanas = v!),
-                ),
-                const Spacer(),
-                Checkbox(
-                  value: _manterSessoes,
-                  onChanged: (v) => setState(() => _manterSessoes = v!),
-                ),
-                const Text('Manter sessões anteriores'),
-              ],
-            ),
-            const SizedBox(height: 16),
 
-            // Botões de ação
-            Row(
-              children: [
-                ElevatedButton(
-                  onPressed: _gerarSessoes,
-                  child: const Text('Gerar Seções'),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: () => setState(() {
-                    _sessoesGeradas.clear();
-                    _duracoes.clear();
-                    _conflitos.clear();
-                  }),
-                  child: const Text('Limpar Seções'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-            // Lista de sessões geradas
-            _buildListaSessoes(),
+                  // Horário Início e Fim
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _pickStartTime,
+                          child: Text('Início: ${_inicio.format(context)}'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _pickEndTime,
+                          child: Text('Fim: ${_fim.format(context)}'),
+                        ),
+                      ),
+                    ],
+                  ),
 
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _salvarSessoes,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
+                  const SizedBox(height: 12),
+
+                  // Dias da semana
+                  Text('Dias da semana:'),
+                  Wrap(
+                    spacing: 8,
+                    children: List.generate(7, (i) {
+                      return FilterChip(
+                        label: Text(_weekDays[i]),
+                        selected: _diasSelecionados[i],
+                        onSelected: (sel) {
+                          setState(() => _diasSelecionados[i] = sel);
+                        },
+                      );
+                    }),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Manter sessões anteriores
+                  Row(
+                    children: [
+                      const Text('Manter sessões anteriores'),
+                      Switch(
+                        value: _manterSessoes,
+                        onChanged: (v) => setState(() => _manterSessoes = v),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Botão gerar
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : () => _gerarSessoes(),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Gerar Sessões'),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Resultados
+                  Expanded(
+                    child: _sessoesGeradas.isEmpty
+                        ? const Center(child: Text('Nenhuma sessão gerada.'))
+                        : ListView.separated(
+                            itemCount: _sessoesGeradas.length,
+                            separatorBuilder: (_, __) => const Divider(),
+                            itemBuilder: (ctx, i) {
+                              final dt = _sessoesGeradas[i];
+                              final dur = _duracoes[i];
+                              final msg = _conflitos[i];
+                              return ListTile(
+                                title: Text(
+                                  '${DateFormat('dd/MM/yyyy HH:mm').format(dt)}'
+                                  ' — $dur min',
+                                ),
+                                subtitle: msg.isEmpty ? null : Text(msg),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-              child: const Text('Salvar Sessões'),
             ),
-          ],
-        ),
-      ),
     );
   }
 }

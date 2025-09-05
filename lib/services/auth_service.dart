@@ -16,7 +16,9 @@ class AuthService {
     serverClientId: _webClientId,
     scopes: [
       'email',
-      calendar.CalendarApi.calendarScope, // https://www.googleapis.com/auth/calendar
+      calendar
+          .CalendarApi
+          .calendarScope, // https://www.googleapis.com/auth/calendar
     ],
   );
 
@@ -40,9 +42,25 @@ class AuthService {
     }
   }
 
+  /// Login com email/senha e retorno do usuário Firebase
+  Future<User?> signInWithEmail(String email, String senha) async {
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: senha,
+      );
+      return cred.user;
+    } catch (e) {
+      print('Erro ao fazer login com email: $e');
+      return null;
+    }
+  }
+
   /// Cria ou atualiza documento do usuário no Firestore
   Future<void> criarOuAtualizarUsuario(User user) async {
-    final docRef = FirebaseFirestore.instance.collection('usuarios').doc(user.uid);
+    final docRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(user.uid);
     final doc = await docRef.get();
     if (!doc.exists) {
       await docRef.set({
@@ -59,20 +77,19 @@ class AuthService {
   /// Retorna true se for o primeiro login (e já atualiza as flags no Firestore)
   Future<bool> isPrimeiroLogin(User user) async {
     try {
-      final docRef = FirebaseFirestore.instance.collection('usuarios').doc(user.uid);
+      final docRef = FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(user.uid);
       final snapshot = await docRef.get();
       final dados = snapshot.data();
       if (dados == null) return false;
 
       final primeiro = dados['primeiroLogin'] ?? false;
-      final manual  = dados['loginManual']   ?? false;
+      final manual = dados['loginManual'] ?? false;
 
       if (primeiro && manual) {
         // após detectar o primeiro login, zera as flags
-        await docRef.update({
-          'primeiroLogin': false,
-          'loginManual': false,
-        });
+        await docRef.update({'primeiroLogin': false, 'loginManual': false});
         return true;
       }
       return false;
