@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:studyflow/services/constants.dart';
-import 'package:studyflow/services/google_auth_client.dart';
 
 class GoogleCalendarService {
   final calendar.CalendarApi api;

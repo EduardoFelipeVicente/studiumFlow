@@ -7,7 +7,7 @@ const String defaultStudySessionTitle =
     '[Study Flow] Sessão de Estudo';
 
 /// Descrição padrão usada quando nenhuma descrição for informada
-const String defaultStudySessionDescription =
+const String defaultStudySessionDes =
     'Sessão gerada automaticamente pelo StudyFlow';
 
 /// Mapeamento de colorId → cor real (usando ARGB)

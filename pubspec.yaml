@@ -7,6 +7,14 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
+  flutter:
+    sdk: flutter
+
+  # Localizações internas ao SDK Flutter  
+  flutter_localizations:
+    sdk: flutter
+
+  # Outras dependências
   syncfusion_flutter_calendar: ^30.2.7
   firebase_core: ^4.0.0
   firebase_auth: ^6.0.1
@@ -18,8 +26,7 @@ dependencies:
   shared_preferences: ^2.2.2
   url_launcher: ^6.1.10
   collection: ^1.17.0
-  flutter:
-    sdk: flutter
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
@@ -28,3 +35,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
