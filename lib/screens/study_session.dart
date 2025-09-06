@@ -3,9 +3,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // para HapticFeedback
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
+import 'package:audioplayers/audioplayers.dart'; // para tocar alert.mp3
 
 import '../components/side_menu.dart';
 import '../services/auth_service.dart';
@@ -21,6 +23,7 @@ class StudySessionScreen extends StatefulWidget {
 }
 
 class _StudySessionScreenState extends State<StudySessionScreen> {
+  bool get _sessionActive => _sessionState == 'foco' || _sessionState == 'pausa';
   final _authService = AuthService();
   late GoogleCalendarService _calendarService;
 
@@ -34,39 +37,68 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
   late final Stopwatch _stopwatch;
   Timer? _timer;
 
+  // Audio player para alertas
+  late final AudioPlayer _audioPlayer;
+
   String _sessionState = 'aguardando'; // 'foco', 'pausa', 'finalizado'
+
+  // controle de ciclos de Pomodoro
+  int _focusCycles = 0;
+  Duration _focusSinceLastPause = Duration.zero;
+  Duration _pauseSinceLastBreak = Duration.zero;
+  bool _alertedFocus = false;
+  bool _alertedPause = false;
+  Duration _currentPausePeriod = kShortPausePeriod;
+
+
 
   @override
   void initState() {
     super.initState();
+
+    // inicializa player de áudio
+    _audioPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+
     _stopwatch = Stopwatch();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_stopwatch.isRunning) {
-        setState(() {
-          if (_sessionState == 'foco') {
-            _focusTime += const Duration(seconds: 1);
-          } else if (_sessionState == 'pausa') {
-            _pauseTime += const Duration(seconds: 1);
+      if (!_stopwatch.isRunning) return;
+
+      setState(() {
+        if (_sessionState == 'foco') {
+          _focusTime += const Duration(seconds: 1);
+          _focusSinceLastPause += const Duration(seconds: 1);
+
+          if (!_alertedFocus && _focusSinceLastPause >= kFocusPeriod) {
+            _alertedFocus = true;
+            _notifyUser(
+              'Tempo de foco atingido (${_formatPeriod(kFocusPeriod)}). Hora da pausa!',
+            );
           }
-        });
-      }
+        } else if (_sessionState == 'pausa') {
+          _pauseTime += const Duration(seconds: 1);
+          _pauseSinceLastBreak += const Duration(seconds: 1);
+
+          if (!_alertedPause && _pauseSinceLastBreak >= _currentPausePeriod) {
+            _alertedPause = true;
+            _notifyUser(
+              'Pausa de ${_formatPeriod(_currentPausePeriod)} concluída. Retome o foco!',
+            );
+          }
+        }
+      });
     });
+
     _init();
   }
 
   Future<void> _init() async {
-    // 1) Pega headers de autenticação
     final headers = await _authService.getAuthHeaders();
     if (headers == null) {
       _showError('Não foi possível autenticar com o Google.');
       return;
     }
-
-    // 2) Cria client autenticado e serviço
     final client = GoogleAuthClient(headers);
     _calendarService = GoogleCalendarService(client);
-
-    // 3) Carrega sessão atual
     await _checkCurrentSession();
   }
 
@@ -77,7 +109,6 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
         maxResults: 10,
         privateExtendedProperties: ['type=${typeSection[1]}'],
       );
-
       final current = items.firstWhereOrNull((ev) {
         final start = ev.start?.dateTime?.toLocal();
         final end = ev.end?.dateTime?.toLocal();
@@ -86,7 +117,6 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
             now.isAfter(start) &&
             now.isBefore(end);
       });
-
       setState(() {
         _currentSession = current;
         _isLoading = false;
@@ -102,13 +132,31 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
       ..reset()
       ..start();
     _sessionStart = DateTime.now();
+    _focusTime = Duration.zero;
+    _pauseTime = Duration.zero;
+    _focusSinceLastPause = Duration.zero;
+    _pauseSinceLastBreak = Duration.zero;
+    _alertedFocus = false;
+    _alertedPause = false;
+    _focusCycles = 0;
+    _currentPausePeriod = kShortPausePeriod;
     setState(() => _sessionState = 'foco');
+    _audioPlayer.stop();
   }
 
   void _togglePause() {
     if (_sessionState == 'foco') {
+      _focusCycles++;
+      _currentPausePeriod = (_focusCycles % 3 == 0)
+          ? kLongPausePeriod
+          : kShortPausePeriod;
+      _pauseSinceLastBreak = Duration.zero;
+      _alertedPause = false;
+      _audioPlayer.stop();
       setState(() => _sessionState = 'pausa');
     } else if (_sessionState == 'pausa') {
+      _focusSinceLastPause = Duration.zero;
+      _alertedFocus = false;
       setState(() => _sessionState = 'foco');
     }
   }
@@ -116,6 +164,29 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
   void _finalizeSession() {
     _stopwatch.stop();
     setState(() => _sessionState = 'finalizado');
+    _calendarService.alterEventOnCalendar(
+      calendarId: 'primary',
+      eventId: _currentSession!.id!,
+      start: _sessionStart!, // horário real de início
+      end: DateTime.now(), // horário real de fim
+      statusSectionIndex: 2, // índice “Concluído”
+      focusDuration: _focusTime, // tempo de foco acumulado
+      pauseDuration: _pauseTime, // tempo de pausa
+      actualStart: _sessionStart, // grava o horário de início real
+    );
+  }
+
+  void _notifyUser(String msg) {
+    // Háptico
+    HapticFeedback.vibrate();
+
+    // Som de alerta via AudioPlayer
+    _audioPlayer.play(AssetSource('sounds/alert.mp3'));
+
+    // SnackBar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 4)),
+    );
   }
 
   void _showError(String msg) {
@@ -125,6 +196,7 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -133,15 +205,21 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
     final fmt = DateFormat('HH:mm');
 
     return Scaffold(
-      drawer: const SideMenu(),
+      drawer: SideMenu(disabled: _sessionActive),
+      drawerEnableOpenDragGesture: !_sessionActive,
+
       appBar: AppBar(
-        title: const Text('Iniciar Seção'),
         backgroundColor: Colors.deepPurple,
+        centerTitle: true,
+        title: const Text(
+          'Iniciar Sessão',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _currentSession == null
-          ? const Center(child: Text('Nenhuma seção agendada no momento.'))
+          ? const Center(child: Text('Nenhuma sessão agendada no momento.'))
           : Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -179,7 +257,7 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
                   if (_sessionState == 'aguardando')
                     ElevatedButton(
                       onPressed: _startSession,
-                      child: const Text('Iniciar Seção'),
+                      child: const Text('Iniciar Sessão'),
                     )
                   else if (_sessionState == 'foco' || _sessionState == 'pausa')
                     ElevatedButton(
@@ -206,21 +284,23 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
   }
 
   Widget _buildTotalBox(String label, Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return Column(
       children: [
         Text(label, style: const TextStyle(fontSize: 14)),
         const SizedBox(height: 4),
         Text(
-          _formatDuration(d),
+          '$m:$s',
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ],
     );
   }
 
-  String _formatDuration(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+  String _formatPeriod(Duration d) {
+    final m = d.inMinutes.toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
   }
 }

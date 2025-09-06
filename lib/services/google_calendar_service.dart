@@ -132,7 +132,8 @@ class GoogleCalendarService {
     await api.events.insert(ev, calendarId);
   }
 
-  /// Atualiza um evento existente usando todos os parâmetros informados.
+  /// Atualiza um evento existente, opcionalmente marcando-o como concluído
+  /// e gravando propriedades extras como horários e durações de foco/pausa.
   Future<void> alterEventOnCalendar({
     required String eventId,
     required DateTime start,
@@ -141,26 +142,29 @@ class GoogleCalendarService {
     String? novaDescricao,
     int? typeSectionIndex,
     int? statusSectionIndex,
+    Duration? focusDuration,
+    Duration? pauseDuration,
+    DateTime? actualStart, // horário real de início da sessão
     String calendarId = 'primary',
     int alertaMinutos = 10,
     String colorId = '6',
     String transparency = 'opaque',
     String visibility = 'default',
   }) async {
-    // 1) Busca o evento original
+    // 1) busca o evento original
     final original = await api.events.get(calendarId, eventId);
 
-    // 2) Cria um novo objeto Event e preenche com valores
+    // 2) constrói o objeto com todos os campos a atualizar
     final updated = calendar.Event();
 
-    // 2.1) Campos básicos
+    // 2.1) campos básicos
     updated.summary = novoTitulo ?? original.summary;
     updated.description = novaDescricao ?? original.description;
     updated.colorId = colorId;
     updated.transparency = transparency;
     updated.visibility = visibility;
 
-    // 2.2) Datas de início e fim (sempre em UTC)
+    // 2.2) datas de início e fim (sempre em UTC)
     updated.start = calendar.EventDateTime(
       dateTime: start.toUtc(),
       timeZone: original.start?.timeZone ?? 'UTC',
@@ -170,7 +174,7 @@ class GoogleCalendarService {
       timeZone: original.end?.timeZone ?? 'UTC',
     );
 
-    // 2.3) Lembrete (override manuais)
+    // 2.3) lembretes
     updated.reminders = calendar.EventReminders(
       useDefault: false,
       overrides: [
@@ -178,22 +182,50 @@ class GoogleCalendarService {
       ],
     );
 
-    // 3) Propriedades estendidas (tipo / status)
+    // 3) propriedades estendidas
+    //    clona as private properties originais pra não perder nada
     final props = Map<String, String>.from(
       original.extendedProperties?.private ?? {},
     );
+
+    // status / type
     if (statusSectionIndex != null) {
       props['status'] = statusSection[statusSectionIndex] ?? statusSection[0]!;
     }
     if (typeSectionIndex != null) {
       props['type'] = typeSection[typeSectionIndex] ?? typeSection[0]!;
     }
+
+    // horário real de início, se informado
+    if (actualStart != null) {
+      props['actualStart'] = actualStart.toIso8601String();
+    }
+
+    // tempos de foco, pausa e total
+    String _fmtDur(Duration d) {
+      final h = d.inHours.toString().padLeft(2, '0');
+      final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+      final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+      return '$h:$m:$s';
+    }
+
+    if (focusDuration != null) {
+      props['focusTime'] = _fmtDur(focusDuration);
+    }
+    if (pauseDuration != null) {
+      props['pauseTime'] = _fmtDur(pauseDuration);
+    }
+    if (focusDuration != null && pauseDuration != null) {
+      final total = focusDuration + pauseDuration;
+      props['totalTime'] = _fmtDur(total);
+    }
+
     updated.extendedProperties = calendar.EventExtendedProperties(
       private: props,
     );
 
-    // 4) Envia patch para o Google Calendar
-    await api.events.patch(updated, calendarId, eventId);
+    // 4) patch no Google Calendar
+    await api.events.patch(updated, calendarId, eventId, sendUpdates: 'all');
   }
 
   /// Exclui um evento
@@ -214,4 +246,21 @@ class GoogleCalendarService {
     );
     return resp.items ?? [];
   }
+
+    Future<List<calendar.Event>> fetchStudySessions({
+    required DateTime timeMin,
+    required DateTime timeMax,
+    List<String>? privateExtendedProperties,
+  }) async {
+    final resp = await api.events.list(
+      'primary',
+      timeMin: timeMin,
+      timeMax: timeMax,
+      privateExtendedProperty: privateExtendedProperties,
+      singleEvents: true,
+      orderBy: 'startTime',
+    );
+    return resp.items ?? <calendar.Event>[];
+  }
+
 }
