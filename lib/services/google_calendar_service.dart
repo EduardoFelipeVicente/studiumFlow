@@ -58,15 +58,16 @@ class GoogleCalendarService {
     required DateTime start,
     required DateTime end,
     String calendarId = 'primary',
+    bool singleEvents = true,
+    String orderBy = 'startTime', 
     List<String>? privateExtendedProperty,
   }) async {
     final resp = await api.events.list(
       calendarId,
       timeMin: start.toUtc(),
       timeMax: end.toUtc(),
-      singleEvents: true,
-      orderBy: 'startTime',
-      // adiciona filtros de extendedProperties se houver
+      singleEvents: singleEvents,          
+      orderBy: orderBy,                    
       privateExtendedProperty: privateExtendedProperty,
     );
     return resp.items ?? [];

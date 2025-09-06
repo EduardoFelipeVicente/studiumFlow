@@ -21,7 +21,6 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
   final _authService = AuthService();
   late GoogleCalendarService _service;
 
-  // controllers para abrir/fechar manualmente os menus
   final MenuController _typeMenuController = MenuController();
   final MenuController _statusMenuController = MenuController();
 
@@ -40,6 +39,9 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
   // filtro de período
   DateTime? _startDate;
   DateTime? _endDate;
+
+  // controle de visualização: 0=Dia,1=Tipo,2=Status
+  int _viewStyle = 0;
 
   @override
   void initState() {
@@ -61,15 +63,24 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
 
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
-    try {
-      final now = DateTime.now();
-      final start = now;
-      final end = now.add(const Duration(days: 365));
 
+    // se o usuário já definiu um range, pega do início daquele dia
+    final fetchStart = _startDate != null
+        ? DateTime(_startDate!.year, _startDate!.month, _startDate!.day)
+        : DateTime.now();
+
+    // se definiu fim, pega até 23:59:59 daquele dia
+    final fetchEnd = _endDate != null
+        ? DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59)
+        : DateTime.now().add(const Duration(days: 365));
+
+    try {
       _allEvents = await _service.fetchEventsBetween(
         calendarId: 'primary',
-        start: start,
-        end: end,
+        start: fetchStart,
+        end: fetchEnd,
+        singleEvents: true,
+        orderBy: 'startTime',
       );
 
       _applyFiltersAndSort();
@@ -81,24 +92,31 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
   }
 
   void _applyFiltersAndSort() {
-    // filtra por tipo/status
+    // aplica filtros de tipo e status
     var filtered = _allEvents.where((e) {
       final props = e.extendedProperties?.private ?? {};
       final type = props['type'] ?? '';
       final status = props['status'] ?? '';
-
       final okType = _typeFilters.isEmpty || _typeFilters.contains(type);
       final okStatus =
           _statusFilters.isEmpty || _statusFilters.contains(status);
       return okType && okStatus;
     }).toList();
 
-    // filtra por período, se definido
+    // filtra por período, se definido, incluindo eventos que começam antes mas ainda estão ativos
     if (_startDate != null && _endDate != null) {
       filtered = filtered.where((e) {
-        final dt = e.start?.dateTime?.toLocal();
-        if (dt == null) return false;
-        return !dt.isBefore(_startDate!) && !dt.isAfter(_endDate!);
+        // tenta pegar dateTime (horário) ou date (all‐day)
+        final startLocal =
+            e.start?.dateTime?.toLocal() ?? e.start?.date?.toLocal();
+        final endLocal = e.end?.dateTime?.toLocal() ?? e.end?.date?.toLocal();
+        if (startLocal == null || endLocal == null) return false;
+
+        // overlap: evento termina depois do início do range
+        //       E evento começa antes do fim do range
+        final overlapStart = !endLocal.isBefore(_startDate!);
+        final overlapEnd = !startLocal.isAfter(_endDate!);
+        return overlapStart && overlapEnd;
       }).toList();
     }
 
@@ -128,6 +146,8 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
         _startDate = range.start;
         _endDate = range.end;
       });
+      // refaz o fetch já que mudou o intervalo
+      await _loadEvents();
     }
   }
 
@@ -140,11 +160,25 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
     final dateFmt = DateFormat('dd/MM/yyyy');
     final timeFmt = DateFormat('HH:mm');
 
-    // agrupa eventos por tipo
+    // 1) Agrupa eventos conforme estilo de visualização
     final grouped = <String, List<calendar.Event>>{};
     for (var e in _events) {
-      final type = e.extendedProperties?.private?['type'] ?? 'Sem Tipo';
-      grouped.putIfAbsent(type, () => []).add(e);
+      final start = e.start?.dateTime?.toLocal();
+      late String key;
+      switch (_viewStyle) {
+        case 0: // Dia
+          key = start != null ? dateFmt.format(start) : 'Sem Data';
+          break;
+        case 1: // Tipo
+          key = e.extendedProperties?.private?['type'] ?? 'Sem Tipo';
+          break;
+        case 2: // Status
+          key = e.extendedProperties?.private?['status'] ?? 'Sem Status';
+          break;
+        default:
+          key = '';
+      }
+      grouped.putIfAbsent(key, () => []).add(e);
     }
 
     return Scaffold(
@@ -183,7 +217,7 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // filtros multi‐select: Tipos e Status
+                  // filtros multi-select: Tipos e Status
                   Row(
                     children: [
                       // Tipos
@@ -200,12 +234,11 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                                     value: sel,
                                     onChanged: (v) {
                                       setState(() {
-                                        if (v! && !_typeFilters.contains(opt)) {
+                                        if (v! && !_typeFilters.contains(opt))
                                           _typeFilters.add(opt);
-                                        } else if (!v &&
-                                            _typeFilters.contains(opt)) {
+                                        else if (!v &&
+                                            _typeFilters.contains(opt))
                                           _typeFilters.remove(opt);
-                                        }
                                       });
                                       setMenuState(() {});
                                       if (_typeFilters.length ==
@@ -228,7 +261,7 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                                     ? 'Selecionar Tipos'
                                     : _typeFilters.join(', '),
                                 maxLines: 1,
-                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.deepPurple,
                                 ),
@@ -253,13 +286,11 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                                     value: sel,
                                     onChanged: (v) {
                                       setState(() {
-                                        if (v! &&
-                                            !_statusFilters.contains(opt)) {
+                                        if (v! && !_statusFilters.contains(opt))
                                           _statusFilters.add(opt);
-                                        } else if (!v &&
-                                            _statusFilters.contains(opt)) {
+                                        else if (!v &&
+                                            _statusFilters.contains(opt))
                                           _statusFilters.remove(opt);
-                                        }
                                       });
                                       setMenuState(() {});
                                       if (_statusFilters.length ==
@@ -282,7 +313,7 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                                     ? 'Selecionar Status'
                                     : _statusFilters.join(', '),
                                 maxLines: 1,
-                                softWrap: false,                                
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.deepPurple,
                                 ),
@@ -306,6 +337,34 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                       textStyle: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // toggle de visualização (Dia/Tipo/Status)
+                  Center(
+                    child: ToggleButtons(
+                      isSelected: List.generate(
+                        styleViewNextEvents.length,
+                        (i) => _viewStyle == i,
+                      ),
+                      onPressed: (i) => setState(() => _viewStyle = i),
+                      borderRadius: BorderRadius.circular(8),
+                      selectedColor: Colors.white,
+                      fillColor: Colors.deepPurple,
+                      color: Colors.deepPurple,
+                      constraints: const BoxConstraints(minWidth: 80),
+                      children: styleViewNextEvents.entries.map((e) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            e.value,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
                   const SizedBox(height: 24),
 
                   // listagem agrupada
@@ -322,27 +381,49 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      ...entry.value.map((e) {
-                        final start = e.start?.dateTime?.toLocal();
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12, left: 8),
+
+                      for (var e in entry.value) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16, left: 8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Título
                               Text(
                                 e.summary ?? 'Sem título',
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                              if (start != null)
-                                Text(
-                                  '${dateFmt.format(start)} ${timeFmt.format(start)}',
-                                  style: const TextStyle(color: Colors.grey),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
+                              ),
+
+                              // Data e intervalo de horas
+                              if (e.start?.dateTime != null &&
+                                  e.end?.dateTime != null)
+                                Text(
+                                  '${dateFmt.format(e.start!.dateTime!.toLocal())} '
+                                  '${timeFmt.format(e.start!.dateTime!.toLocal())} até '
+                                  '${timeFmt.format(e.end!.dateTime!.toLocal())}',
+                                  style: const TextStyle(color: Colors.black),
+                                ),
+
+                              // Tipo / Status
+                              Text(
+                                'Tipo: ${e.extendedProperties?.private?['type'] ?? 'Sem Tipo'}    '
+                                'Status: ${e.extendedProperties?.private?['status'] ?? 'Sem Status'}',
+                                style: const TextStyle(color: Colors.black),
+                              ),
+
+                              // Descrição
+                              if ((e.description ?? '').isNotEmpty)
+                                Text(e.description!),
+
                               const SizedBox(height: 8),
                             ],
                           ),
-                        );
-                      }),
+                        ),
+                      ],
+
                       const Divider(),
                       const SizedBox(height: 16),
                     ],

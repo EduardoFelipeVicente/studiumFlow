@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../services/google_auth_client.dart';
 import '../services/google_calendar_service.dart';
 import '../components/side_menu.dart';
+import '../services/constants.dart';
 
 class StudyScheduleScreen extends StatefulWidget {
   const StudyScheduleScreen({Key? key}) : super(key: key);
@@ -21,8 +22,6 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
   bool _calendarInitialized = false;
 
   // Título e descrição
-  static const _defaultTitle = '[StudyFlow] Sessão de Estudo';
-  static const _defaultDesc = 'Descrição da sessão';
   late TextEditingController _titleController;
   late TextEditingController _descController;
   late FocusNode _titleFocus;
@@ -38,8 +37,10 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
 
   // Resultados
   List<DateTime> _sessoesGeradas = [];
-  List<int> _duracoes = [];
-  List<String> _conflitos = [];
+  List<int> _duracoesGeradas = [];
+  List<String> _titulosGerados = [];
+  List<String> _descricoesGeradas = [];
+  List<String> _conflitosGerados = [];
 
   bool _isLoading = false;
   bool _isSaving = false;
@@ -57,26 +58,27 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
   void initState() {
     super.initState();
     // controllers de título e descrição
-    _titleController = TextEditingController(text: _defaultTitle);
-    _descController = TextEditingController(text: _defaultDesc);
+    _titleController = TextEditingController(text: defaultStudySessionTitle);
+    _descController = TextEditingController(text: defaultStudySessionDes);
     _titleFocus = FocusNode()..addListener(_onTitleFocusChange);
     _descFocus = FocusNode()..addListener(_onDescFocusChange);
     _initCalendarService();
   }
 
   void _onTitleFocusChange() {
-    if (_titleFocus.hasFocus && _titleController.text == _defaultTitle) {
+    if (_titleFocus.hasFocus &&
+        _titleController.text == defaultStudySessionTitle) {
       _titleController.clear();
     } else if (!_titleFocus.hasFocus && _titleController.text.trim().isEmpty) {
-      _titleController.text = _defaultTitle;
+      _titleController.text = defaultStudySessionTitle;
     }
   }
 
   void _onDescFocusChange() {
-    if (_descFocus.hasFocus && _descController.text == _defaultDesc) {
+    if (_descFocus.hasFocus && _descController.text == defaultStudySessionDes) {
       _descController.clear();
     } else if (!_descFocus.hasFocus && _descController.text.trim().isEmpty) {
-      _descController.text = _defaultDesc;
+      _descController.text = defaultStudySessionDes;
     }
   }
 
@@ -114,26 +116,47 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
       _showError('Aguarde a inicialização da agenda.');
       return;
     }
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
+
+    // 1) Título e descrição digitados pelo usuário no momento da geração
+    final userTitle = _titleController.text.trim();
+    final userDesc = _descController.text.trim();
+
+    // 2) Se não for acumular (_manterSessoes == false), limpar tudo antes
+    if (!_manterSessoes) {
+      _sessoesGeradas.clear();
+      _duracoesGeradas.clear();
+      _titulosGerados.clear();
+      _descricoesGeradas.clear();
+      _conflitosGerados.clear();
+    }
 
     final hoje = DateTime.now();
     final novas = <DateTime>[];
     final duracoes = <int>[];
+    final titulos = <String>[];
+    final descrs = <String>[];
     final conflitos = <String>[];
 
+    final fmtDt = DateFormat('dd/MM/yyyy');
+    final fmtTm = DateFormat('HH:mm');
+
+    // 3) Loop de semanas e dias selecionados
     for (int semana = 0; semana < _semanas; semana++) {
       for (int i = 0; i < 7; i++) {
         if (!_diasSelecionados[i]) continue;
+
+        // calcula o próximo dia daquela semana
         final offset = (i + 1 - hoje.weekday + 7) % 7;
         final dia = hoje.add(Duration(days: offset + semana * 7));
 
+        // intervalo em minutos
         final inicioMin = _inicio.hour * 60 + _inicio.minute;
         final fimMin = _fim.hour * 60 + _fim.minute;
         final dur = fimMin - inicioMin;
         if (dur <= 0) continue;
 
+        // instantes
         final start = DateTime(
           dia.year,
           dia.month,
@@ -143,45 +166,48 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
         );
         final end = start.add(Duration(minutes: dur));
 
+        // verifica conflitos no Calendar
         final evs = await _calendarService.fetchEventsBetween(
           start: start,
           end: end,
           calendarId: _agendaId,
         );
+
+        // 4) monta título e descrição sempre a partir do input
+        final tituloSessao = userTitle.isNotEmpty
+            ? userTitle
+            : 'Sessão ${fmtDt.format(start)} ${fmtTm.format(start)}';
+        final descricaoSessao = userDesc;
+
+        // 5) prepara texto de conflito (ou string vazia se não houver)
         if (evs.isNotEmpty) {
           final ev = evs.first;
-          final fmtDt = DateFormat('dd/MM/yyyy');
-          final fmtTm = DateFormat('HH:mm');
           final ini = fmtTm.format(ev.start!.dateTime!.toLocal());
           final fi = fmtTm.format(ev.end!.dateTime!.toLocal());
-          final ttl = ev.summary ?? '(Sem título)';
           conflitos.add(
-            '${fmtDt.format(start)} ${fmtTm.format(start)} às ${fmtTm.format(end)} '
-            '– $dur min\n⚠️ conflita com "$ttl" ($ini–$fi)',
+            '⚠️ Conflito em ${fmtDt.format(start)} '
+            '${fmtTm.format(start)}–${fmtTm.format(end)}: '
+            '"${ev.summary ?? '(Sem título)'}" ($ini–$fi)',
           );
         } else {
-          conflitos.add(
-            '${DateFormat('dd/MM/yyyy').format(start)} '
-            '${DateFormat('HH:mm').format(start)} às '
-            '${DateFormat('HH:mm').format(end)} – $dur min',
-          );
+          conflitos.add(''); // sem conflito
         }
 
+        // 6) acumula nos arrays temporários
         novas.add(start);
         duracoes.add(dur);
+        titulos.add(tituloSessao);
+        descrs.add(descricaoSessao);
       }
     }
 
+    // 7) persiste no estado, acumulando ou sobrescrevendo conforme a flag
     setState(() {
-      if (_manterSessoes) {
-        _sessoesGeradas.addAll(novas);
-        _duracoes.addAll(duracoes);
-        _conflitos.addAll(conflitos);
-      } else {
-        _sessoesGeradas = novas;
-        _duracoes = duracoes;
-        _conflitos = conflitos;
-      }
+      _sessoesGeradas.addAll(novas);
+      _duracoesGeradas.addAll(duracoes);
+      _titulosGerados.addAll(titulos);
+      _descricoesGeradas.addAll(descrs);
+      _conflitosGerados.addAll(conflitos);
       _isLoading = false;
     });
   }
@@ -193,45 +219,43 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
     }
     setState(() => _isSaving = true);
 
-    // 1) detecta índices que têm conflito (marcador '⚠️')
+    // 1) detecta índices que têm conflito
     final conflictIdx = <int>[];
-    for (var i = 0; i < _conflitos.length; i++) {
-      if (_conflitos[i].contains('⚠️')) {
+    for (var i = 0; i < _conflitosGerados.length; i++) {
+      if (_conflitosGerados[i].contains('⚠️')) {
         conflictIdx.add(i);
       }
     }
 
-    // 2) se houver conflito, pergunte ao usuário
+    // 2) se houver conflito, pergunta ao usuário
     String? decision = 'all';
     if (conflictIdx.isNotEmpty) {
       decision = await _confirmarConflitos();
     }
 
-    // 3) se o usuário escolheu "Retornar" ou fechou o diálogo, cancela tudo
-    if (decision == 'none' || decision == null) {
+    // 3) se o usuário cancelar ou escolher 'none', aborta
+    if (decision == null || decision == 'none') {
       setState(() => _isSaving = false);
       return;
     }
 
-    // 4) monta a lista de índices que serão salvos
+    // 4) monta a lista de índices que serão efetivamente salvos
     final allIdx = List.generate(_sessoesGeradas.length, (i) => i);
     late final List<int> toSave;
     if (decision == 'partial') {
-      // só os que NÃO estão em conflictIdx
       toSave = allIdx.where((i) => !conflictIdx.contains(i)).toList();
     } else {
-      // 'all'
       toSave = allIdx;
     }
 
-    // 5) salva no Calendar
+    // 5) insere cada sessão no calendário usando título/descrição individuais
     try {
       for (final i in toSave) {
         await _calendarService.insertEventOnCalendar(
           start: _sessoesGeradas[i],
-          duracaoMinutos: _duracoes[i],
-          titulo: _titleController.text.trim(),
-          descricao: _descController.text.trim(),
+          duracaoMinutos: _duracoesGeradas[i],
+          titulo: _titulosGerados[i],
+          descricao: _descricoesGeradas[i],
           sectionTypeIndex: 1, // Seção Estudo
           statusSectionIndex: 1, // Agendado
           calendarId: _agendaId,
@@ -243,18 +267,14 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
         const SnackBar(content: Text('Sessões salvas com sucesso!')),
       );
 
-      // 7) remove só os itens salvos, invertendo a ordem para não bagunçar índices
+      // 7) remove dos buffers apenas os itens que foram salvos
       setState(() {
-        if (decision == 'all') {
-          _sessoesGeradas.clear();
-          _duracoes.clear();
-          _conflitos.clear();
-        } else {
-          for (final i in toSave.reversed) {
-            _sessoesGeradas.removeAt(i);
-            _duracoes.removeAt(i);
-            _conflitos.removeAt(i);
-          }
+        for (final i in toSave.reversed) {
+          _sessoesGeradas.removeAt(i);
+          _duracoesGeradas.removeAt(i);
+          _titulosGerados.removeAt(i);
+          _descricoesGeradas.removeAt(i);
+          _conflitosGerados.removeAt(i);
         }
       });
     } catch (e) {
@@ -267,8 +287,8 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
   void _clearSessoes() {
     setState(() {
       _sessoesGeradas.clear();
-      _duracoes.clear();
-      _conflitos.clear();
+      _duracoesGeradas.clear();
+      _conflitosGerados.clear();
     });
   }
 
@@ -278,6 +298,9 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final dateFmt = DateFormat('dd/MM/yyyy');
+    final timeFmt = DateFormat('HH:mm');
+
     return Scaffold(
       drawer: const SideMenu(),
       appBar: AppBar(
@@ -469,7 +492,7 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Lista de sessões inline
+                      // lista de sessões geradas
                       if (_sessoesGeradas.isEmpty)
                         const Text('Nenhuma sessão gerada.')
                       else
@@ -478,9 +501,42 @@ class _StudyScheduleScreenState extends State<StudyScheduleScreen> {
                             margin: const EdgeInsets.symmetric(vertical: 6),
                             child: Padding(
                               padding: const EdgeInsets.all(12),
-                              child: Text(
-                                _conflitos[i],
-                                style: const TextStyle(fontSize: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // título
+                                  Text(
+                                    _titulosGerados[i],
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+
+                                  // data e intervalo
+                                  Text(
+                                    '${dateFmt.format(_sessoesGeradas[i])} '
+                                    '${timeFmt.format(_sessoesGeradas[i])} até '
+                                    '${timeFmt.format(_sessoesGeradas[i].add(Duration(minutes: _duracoesGeradas[i])))}',
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+
+                                  // descrição
+                                  if (_descricoesGeradas[i].isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(_descricoesGeradas[i]),
+                                  ],
+
+                                  // conflito (se houver)
+                                  if (_conflitosGerados[i].contains('⚠️')) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _conflitosGerados[i],
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),

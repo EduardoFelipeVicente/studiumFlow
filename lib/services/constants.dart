@@ -57,3 +57,9 @@ const Map<int, String> statusSection = {
   3:  'Atrasado',
   4:  'Outros',
 };
+
+const Map<int, String> styleViewNextEvents = {
+  0:  'Dia',
+  1:  'Tipo',
+  2:  'Status',
+};
