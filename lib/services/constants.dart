@@ -47,7 +47,8 @@ const Map<int, String> typeSection = {
   1:  'Seção Estudo',
   2:  'Prova',
   3:  'Trabalho',
-  4:  'Outros',
+  4:  'Revisão',
+  5:  'Outros',
 };
 
 const Map<int, String> statusSection = {
@@ -55,7 +56,8 @@ const Map<int, String> statusSection = {
   1:  'Agendado',
   2:  'Concluido',
   3:  'Atrasado',
-  4:  'Outros',
+  4:  'Cancelado',
+  5:  'Outros',
 };
 
 const Map<int, String> styleViewNextEvents = {

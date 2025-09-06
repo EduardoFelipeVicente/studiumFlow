@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:intl/intl.dart';
 
+import '../components/side_menu.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_client.dart';
 import '../services/google_calendar_service.dart';
@@ -23,10 +24,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _isLoading = true;
   List<Appointment> _appointments = [];
   CalendarView _view = CalendarView.week;
+  // Controller que realmente comanda a troca de view no SfCalendar
+  final CalendarController _calendarController = CalendarController();
 
   @override
   void initState() {
     super.initState();
+    // Sincroniza o controller com a _view inicial
+    _calendarController.view = _view;
     _initCalendar();
   }
 
@@ -36,8 +41,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _showError('Não foi possível autenticar com o Google.');
       return;
     }
-    final client = GoogleAuthClient(headers);
-    _calendarService = GoogleCalendarService(client);
+
+    _calendarService = GoogleCalendarService(GoogleAuthClient(headers));
     await _loadAppointments();
   }
 
@@ -46,18 +51,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       final events = await _calendarService.fetchAllEvents();
       _appointments = events.map((e) {
-        final s = e.start!.dateTime!.toLocal();
-        final t = e.end!.dateTime!.toLocal();
+        final start = e.start!.dateTime!.toLocal();
+        final end = e.end!.dateTime!.toLocal();
         return Appointment(
-          startTime: s,
-          endTime: t,
+          startTime: start,
+          endTime: end,
           subject: e.summary ?? 'Sem título',
           notes: e.description,
           id: e.id,
           color: eventColorMap[e.colorId] ?? Colors.deepPurple,
         );
       }).toList();
-      setState(() {});
     } catch (e) {
       _showError('Erro ao carregar eventos: $e');
     } finally {
@@ -66,13 +70,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
-  }
-
-  void _changeView(CalendarView view) {
-    setState(() => _view = view);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _onTap(CalendarTapDetails details) {
@@ -86,6 +84,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _showDetailsDialog(Appointment appt) {
     final fmt = DateFormat('dd/MM/yyyy HH:mm');
+
+    Future<int> _getTypeIndex() async {
+      try {
+        final props = await _calendarService.getEventExtendedProperties(
+          appt.id as String,
+        );
+        return typeSection.entries
+            .firstWhere(
+              (e) => e.value == props['type'],
+              orElse: () => const MapEntry(0, 'Nenhum'),
+            )
+            .key;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    final colorEntry = eventColorMap.entries.firstWhere(
+      (e) => e.value == appt.color,
+      orElse: () => const MapEntry('6', Colors.deepPurple),
+    );
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -104,13 +124,54 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _openEventDialog(appt.startTime, appt: appt);
             },
             child: const Text('Editar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final typeIdx = await _getTypeIndex();
+              await _calendarService.alterEventOnCalendar(
+                eventId: appt.id as String,
+                start: appt.startTime,
+                end: appt.endTime,
+                novoTitulo: appt.subject,
+                novaDescricao: appt.notes ?? '',
+                typeSectionIndex: typeIdx,
+                statusSectionIndex: 2, // Concluído
+                calendarId: 'primary',
+                colorId: colorEntry.key,
+              );
+              await _loadAppointments();
+            },
+            child: const Text('Concluir'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final typeIdx = await _getTypeIndex();
+              await _calendarService.alterEventOnCalendar(
+                eventId: appt.id as String,
+                start: appt.startTime,
+                end: appt.endTime,
+                novoTitulo: appt.subject,
+                novaDescricao: appt.notes ?? '',
+                typeSectionIndex: typeIdx,
+                statusSectionIndex: 4, // Cancelado
+                calendarId: 'primary',
+                colorId: colorEntry.key,
+              );
+              await _loadAppointments();
+            },
+            child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () {
@@ -133,34 +194,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  void _openEventDialog(DateTime initialDate, {Appointment? appt}) async {
+  Future<void> _openEventDialog(
+    DateTime initialDate, {
+    Appointment? appt,
+  }) async {
     final titleCtrl = TextEditingController(text: appt?.subject ?? '');
     final descCtrl = TextEditingController(text: appt?.notes ?? '');
     DateTime start = appt?.startTime ?? initialDate;
     DateTime end = appt?.endTime ?? initialDate.add(const Duration(hours: 1));
+
     String colorId = eventColorMap.entries
-            .firstWhere(
-              (e) => e.value == appt?.color,
-              orElse: () => const MapEntry('6', Colors.deepPurple),
-            )
-            .key;
+        .firstWhere(
+          (e) => e.value == appt?.color,
+          orElse: () => const MapEntry('6', Colors.deepPurple),
+        )
+        .key;
 
     int typeIndex = 0;
     int statusIndex = 1;
-
     if (appt != null) {
       try {
-        final props = await _calendarService.getEventExtendedProperties(appt.id as String);
+        final props = await _calendarService.getEventExtendedProperties(
+          appt.id as String,
+        );
         typeIndex = typeSection.entries
-            .firstWhere((e) => e.value == props['type'], orElse: () => const MapEntry(0, 'Nenhum'))
+            .firstWhere(
+              (e) => e.value == props['type'],
+              orElse: () => const MapEntry(0, 'Nenhum'),
+            )
             .key;
         statusIndex = statusSection.entries
-            .firstWhere((e) => e.value == props['status'], orElse: () => const MapEntry(1, 'Agendado'))
+            .firstWhere(
+              (e) => e.value == props['status'],
+              orElse: () => const MapEntry(1, 'Agendado'),
+            )
             .key;
-      } catch (_) { /* ignora se não encontrar */ }
+      } catch (_) {}
     }
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
@@ -169,19 +241,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Título
-                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Título'),
+                ),
                 const SizedBox(height: 8),
-                // Descrição
-                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Descrição')),
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(labelText: 'Descrição'),
+                ),
                 const SizedBox(height: 12),
-                // Início
+
                 ElevatedButton(
                   onPressed: () async {
                     final d = await showDatePicker(
                       context: context,
                       initialDate: start,
-                      firstDate: DateTime(2020),
+                      firstDate: DateTime(2000),
                       lastDate: DateTime(2100),
                     );
                     if (d == null) return;
@@ -191,20 +267,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     );
                     if (t == null) return;
                     setState(() {
-                      start = DateTime(d.year, d.month, d.day, t.hour, t.minute);
-                      if (appt == null) end = start.add(const Duration(hours: 1));
+                      start = DateTime(
+                        d.year,
+                        d.month,
+                        d.day,
+                        t.hour,
+                        t.minute,
+                      );
+                      if (appt == null)
+                        end = start.add(const Duration(hours: 1));
                     });
                   },
-                  child: Text('Início: ${start.toLocal()}'),
+                  child: Text(
+                    'Início: ${DateFormat('dd/MM/yyyy HH:mm').format(start)}',
+                  ),
                 ),
                 const SizedBox(height: 8),
-                // Fim
                 ElevatedButton(
                   onPressed: () async {
                     final d = await showDatePicker(
                       context: context,
                       initialDate: end,
-                      firstDate: DateTime(2020),
+                      firstDate: DateTime(2000),
                       lastDate: DateTime(2100),
                     );
                     if (d == null) return;
@@ -217,54 +301,65 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       end = DateTime(d.year, d.month, d.day, t.hour, t.minute);
                     });
                   },
-                  child: Text('Fim: ${end.toLocal()}'),
+                  child: Text(
+                    'Fim:    ${DateFormat('dd/MM/yyyy HH:mm').format(end)}',
+                  ),
                 ),
                 const SizedBox(height: 12),
-                // Cor
-DropdownButtonFormField<String>(
-  value: colorId,
-  decoration: const InputDecoration(labelText: 'Cor'),
-  items: eventColorMap.entries.map((entry) {
-    final id = entry.key;
-    final color = entry.value;
-    final name = eventColorNames[id]!;
-    return DropdownMenuItem(
-      value: id,
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: color,           // agora é um Color de verdade
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(name),
-        ],
-      ),
-    );
-  }).toList(),
-  onChanged: (v) => setState(() => colorId = v!),
-),
+
+                DropdownButtonFormField<String>(
+                  value: colorId,
+                  decoration: const InputDecoration(labelText: 'Cor'),
+                  items: eventColorMap.entries.map((e) {
+                    return DropdownMenuItem(
+                      value: e.key,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: e.value,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(eventColorNames[e.key]!),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setState(() => colorId = v!),
+                ),
                 const SizedBox(height: 12),
-                // Tipo
+
                 DropdownButtonFormField<int>(
                   value: typeIndex,
-                  decoration: const InputDecoration(labelText: 'Tipo da Sessão'),
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo da Sessão',
+                  ),
                   items: typeSection.entries
-                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => typeIndex = v!),
                 ),
                 const SizedBox(height: 12),
-                // Status
+
                 DropdownButtonFormField<int>(
                   value: statusIndex,
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: statusSection.entries
-                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => statusIndex = v!),
                 ),
@@ -272,34 +367,38 @@ DropdownButtonFormField<String>(
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
             TextButton(
               onPressed: () async {
-                Navigator.pop(context);
-                try {
-                  if (appt == null) {
-                    await _calendarService.insertEventOnCalendar(
-                      start: start,
-                      duracaoMinutos: end.difference(start).inMinutes,
-                      titulo: titleCtrl.text.trim(),
-                      descricao: descCtrl.text.trim(),
-                      sectionTypeIndex: typeIndex,
-                      statusSectionIndex: statusIndex,
-                      calendarId: 'primary',
-                      colorId: colorId,
-                    );
-                  } else {
-                    await _calendarService.alterEventOnCalendar(
-                      eventId: appt.id as String,
-                      calendarId: 'primary',
-                      novaDescricao: descCtrl.text.trim(),
-                      statusSectionIndex: statusIndex,
-                    );
-                  }
-                  await _loadAppointments();
-                } catch (e) {
-                  _showError('Erro ao salvar evento: $e');
+                Navigator.pop(ctx);
+                if (appt == null) {
+                  await _calendarService.insertEventOnCalendar(
+                    start: start,
+                    duracaoMinutos: end.difference(start).inMinutes,
+                    titulo: titleCtrl.text.trim(),
+                    descricao: descCtrl.text.trim(),
+                    sectionTypeIndex: typeIndex,
+                    statusSectionIndex: statusIndex,
+                    calendarId: 'primary',
+                    colorId: colorId,
+                  );
+                } else {
+                  await _calendarService.alterEventOnCalendar(
+                    eventId: appt.id as String,
+                    start: start,
+                    end: end,
+                    novoTitulo: titleCtrl.text.trim(),
+                    novaDescricao: descCtrl.text.trim(),
+                    typeSectionIndex: typeIndex,
+                    statusSectionIndex: statusIndex,
+                    calendarId: 'primary',
+                    colorId: colorId,
+                  );
                 }
+                await _loadAppointments();
               },
               child: const Text('Salvar'),
             ),
@@ -311,25 +410,134 @@ DropdownButtonFormField<String>(
 
   @override
   Widget build(BuildContext context) {
+    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+    final timeFmt = DateFormat('HH:mm');
+
+    // prepara próximos 5 eventos
+    final now = DateTime.now();
+    final upcoming =
+        _appointments.where((a) => a.startTime.isAfter(now)).toList()
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
     return Scaffold(
+      drawer: const SideMenu(),
       appBar: AppBar(
-        title: const Text('Agenda'),
-        actions: [
-          IconButton(icon: const Icon(Icons.calendar_view_day), onPressed: () => _changeView(CalendarView.day)),
-          IconButton(icon: const Icon(Icons.view_week), onPressed: () => _changeView(CalendarView.week)),
-          IconButton(icon: const Icon(Icons.calendar_month), onPressed: () => _changeView(CalendarView.month)),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadAppointments),
-        ],
+        backgroundColor: Colors.deepPurple,
+        centerTitle: true,
+        title: const Text(
+          'Agenda',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+/*        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_view_day),
+            onPressed: () => _changeView(CalendarView.day),
+          ),
+          IconButton(
+            icon: const Icon(Icons.view_week),
+            onPressed: () => _changeView(CalendarView.week),
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: () => _changeView(CalendarView.month),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadAppointments,
+          ),
+        ],*/
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SfCalendar(
-              view: _view,
-              dataSource: AppointmentDataSource(_appointments),
-              onTap: _onTap,
-              firstDayOfWeek: 1,
+          : Column(
+              children: [
+                // ToggleButtons Dia / Semana / Mês
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: ToggleButtons(
+                    borderRadius: BorderRadius.circular(4),
+                    selectedColor: Colors.white,
+                    fillColor: Colors.deepPurple,
+                    color: Colors.deepPurple,
+                    isSelected: [
+                      _view == CalendarView.day,
+                      _view == CalendarView.week,
+                      _view == CalendarView.month,
+                    ],
+                    onPressed: (i) {
+                      final views = [
+                        CalendarView.day,
+                        CalendarView.week,
+                        CalendarView.month,
+                      ];
+                      _changeView(views[i]);
+                    },
+                    children: const [
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Icon(Icons.calendar_view_day),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Icon(Icons.view_week),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Icon(Icons.calendar_month),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Calendário Syncfusion
+                Expanded(
+                  child: SfCalendar(
+                    controller: _calendarController,
+                    dataSource: AppointmentDataSource(_appointments),
+                    onTap: _onTap,
+                    firstDayOfWeek: 1,
+                  ),
+                ),
+
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Próximos eventos',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (upcoming.isEmpty)
+                        const Text('Nenhum evento futuro.')
+                      else
+                        ...upcoming.take(5).map((a) {
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(a.subject),
+                            subtitle: Text(
+                              '${dateFmt.format(a.startTime)} até ${timeFmt.format(a.endTime)}',
+                            ),
+                            onTap: () => _showDetailsDialog(a),
+                          );
+                        }),
+                    ],
+                  ),
+                ),
+              ],
             ),
     );
+  }
+
+  void _changeView(CalendarView view) {
+    setState(() => _view = view);
+    _calendarController.view = view;
   }
 }
 

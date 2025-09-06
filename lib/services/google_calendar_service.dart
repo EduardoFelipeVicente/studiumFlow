@@ -59,15 +59,15 @@ class GoogleCalendarService {
     required DateTime end,
     String calendarId = 'primary',
     bool singleEvents = true,
-    String orderBy = 'startTime', 
+    String orderBy = 'startTime',
     List<String>? privateExtendedProperty,
   }) async {
     final resp = await api.events.list(
       calendarId,
       timeMin: start.toUtc(),
       timeMax: end.toUtc(),
-      singleEvents: singleEvents,          
-      orderBy: orderBy,                    
+      singleEvents: singleEvents,
+      orderBy: orderBy,
       privateExtendedProperty: privateExtendedProperty,
     );
     return resp.items ?? [];
@@ -132,37 +132,67 @@ class GoogleCalendarService {
     await api.events.insert(ev, calendarId);
   }
 
-  /// Atualiza um evento existente
+  /// Atualiza um evento existente usando todos os parâmetros informados.
   Future<void> alterEventOnCalendar({
     required String eventId,
-    String calendarId = 'primary',
-    int? statusSectionIndex,
+    required DateTime start,
+    required DateTime end,
+    String? novoTitulo,
     String? novaDescricao,
+    int? typeSectionIndex,
+    int? statusSectionIndex,
+    String calendarId = 'primary',
+    int alertaMinutos = 10,
+    String colorId = '6',
+    String transparency = 'opaque',
+    String visibility = 'default',
   }) async {
+    // 1) Busca o evento original
     final original = await api.events.get(calendarId, eventId);
+
+    // 2) Cria um novo objeto Event e preenche com valores
     final updated = calendar.Event();
 
-    // mantêm todos os campos originais, só altera description e status
-    updated.summary = original.summary;
-    updated.start = original.start;
-    updated.end = original.end;
-    updated.colorId = original.colorId;
-    updated.transparency = original.transparency;
-    updated.visibility = original.visibility;
-    updated.reminders = original.reminders;
+    // 2.1) Campos básicos
+    updated.summary = novoTitulo ?? original.summary;
     updated.description = novaDescricao ?? original.description;
+    updated.colorId = colorId;
+    updated.transparency = transparency;
+    updated.visibility = visibility;
 
-    // atualiza status em extendedProperties.private
+    // 2.2) Datas de início e fim (sempre em UTC)
+    updated.start = calendar.EventDateTime(
+      dateTime: start.toUtc(),
+      timeZone: original.start?.timeZone ?? 'UTC',
+    );
+    updated.end = calendar.EventDateTime(
+      dateTime: end.toUtc(),
+      timeZone: original.end?.timeZone ?? 'UTC',
+    );
+
+    // 2.3) Lembrete (override manuais)
+    updated.reminders = calendar.EventReminders(
+      useDefault: false,
+      overrides: [
+        calendar.EventReminder(method: 'popup', minutes: alertaMinutos),
+      ],
+    );
+
+    // 3) Propriedades estendidas (tipo / status)
     final props = Map<String, String>.from(
       original.extendedProperties?.private ?? {},
     );
     if (statusSectionIndex != null) {
       props['status'] = statusSection[statusSectionIndex] ?? statusSection[0]!;
     }
+    if (typeSectionIndex != null) {
+      props['type'] = typeSection[typeSectionIndex] ?? typeSection[0]!;
+    }
     updated.extendedProperties = calendar.EventExtendedProperties(
       private: props,
     );
 
+    // 4) Envia patch para o Google Calendar
     await api.events.patch(updated, calendarId, eventId);
   }
 

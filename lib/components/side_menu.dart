@@ -31,7 +31,7 @@ class SideMenu extends StatelessWidget {
           ),
 
           ListTile(
-            leading: const Icon(Icons.schedule),
+            leading: const Icon(Icons.dashboard_customize_rounded),
             title: const Text('Criar Agenda de Estudos'),
             onTap: () {
               Navigator.push(
@@ -42,7 +42,7 @@ class SideMenu extends StatelessWidget {
           ),
 
           ListTile(
-            leading: const Icon(Icons.access_time),
+            leading: const Icon(Icons.alarm),
             title: const Text('Próximas Seções'),
             onTap: () {
               // 1. Fecha a drawer (se estiver dentro de um Drawer)
