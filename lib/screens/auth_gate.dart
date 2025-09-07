@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 // Telas
-import 'package:studyflow/screens/login_screen.dart';
-import 'package:studyflow/screens/welcome_screen.dart';
-import 'package:studyflow/screens/home_screen.dart';
+import '../screens/login_screen.dart';
+import '../screens/welcome_screen.dart';
+import '../screens/home_screen.dart';
 
 // Serviço
-import 'package:studyflow/services/auth_service.dart' as auth_service;
+import '../services/auth_service.dart' as auth_service;
 
 class AuthGate extends StatelessWidget {
   const AuthGate({Key? key}) : super(key: key);

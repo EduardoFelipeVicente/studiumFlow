@@ -2,13 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:studyflow/screens/settings_screen.dart';
-import 'package:studyflow/screens/calendar_screen.dart';
-import 'package:studyflow/screens/study_schedule_screen.dart';
-import 'package:studyflow/screens/next_events.dart';
-import 'package:studyflow/screens/study_session.dart';
-import 'package:studyflow/screens/progress_screen.dart';
-import 'package:studyflow/services/auth_service.dart';
+import '../screens/settings_screen.dart';
+import '../screens/calendar_screen.dart';
+import '../screens/study_schedule_screen.dart';
+import '../screens/next_events_screen.dart';
+import '../screens/study_session_screen.dart';
+import '../screens/progress_screen.dart';
+import '../services/auth_service.dart';
+import '../screens/home_screen.dart';
 
 class SideMenu extends StatelessWidget {
   /// Quando [disabled] for true, bloqueia taps e cinza os itens.
@@ -35,6 +36,17 @@ class SideMenu extends StatelessWidget {
               ),
             ),
             decoration: const BoxDecoration(color: Colors.deepPurple),
+          ),
+
+          _buildTile(
+            context,
+            icon: Icons.home,
+            label: 'Início',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            ),
+            textColor: textColor,
           ),
 
           _buildTile(

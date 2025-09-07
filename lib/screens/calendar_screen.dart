@@ -428,24 +428,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           'Agenda',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-/*        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_view_day),
-            onPressed: () => _changeView(CalendarView.day),
-          ),
-          IconButton(
-            icon: const Icon(Icons.view_week),
-            onPressed: () => _changeView(CalendarView.week),
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () => _changeView(CalendarView.month),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAppointments,
-          ),
-        ],*/
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

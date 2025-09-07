@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:studyflow/services/auth_service.dart';
-import 'package:studyflow/components/side_menu.dart';
+import '../services/auth_service.dart';
+import '../components/side_menu.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -12,8 +12,12 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configurações'),
         backgroundColor: Colors.deepPurple,
+        centerTitle: true,
+        title: const Text(
+          'Configurações',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       drawer: const SideMenu(), // ✅ Adicionado menu lateral
       body: Padding(
@@ -40,7 +44,9 @@ class SettingsScreen extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: () async {
                 await AuthService().logout();
-                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/', (route) => false);
               },
               icon: const Icon(Icons.logout),
               label: const Text('Sair da conta'),

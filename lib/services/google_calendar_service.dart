@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
-import 'package:studyflow/services/constants.dart';
+import '../services/constants.dart';
 
 class GoogleCalendarService {
   final calendar.CalendarApi api;
@@ -273,10 +273,7 @@ class GoogleCalendarService {
 
   Future<void> updateLateEvents() async {
     final now = DateTime.now().toUtc();
-    print(
-      '[updateLateEvents] Iniciando verificação de eventos atrasados em $now',
-    );
-
+  
     // Busca eventos que terminaram até agora
     final events = await fetchStudySessions(
       timeMin: DateTime.utc(2000), // busca ampla
@@ -296,7 +293,6 @@ class GoogleCalendarService {
           status != statusSection[2] && // Concluído
           status != statusSection[4] && // Cancelado
           tipo != typeSection[0]; // Tipo Nenhum
-      print('É atrasado? ${isAtrasado ? "SIM" : "NÃO"} ${ev.summary}');
 
       if (isAtrasado && id != null) {
         await alterEventOnCalendar(
@@ -305,7 +301,6 @@ class GoogleCalendarService {
         );
       }
 
-      print('[updateLateEvents] Verificação concluída.');
     }
   }
 }
