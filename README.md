@@ -6,9 +6,7 @@
 
 ## 👥 Integrantes
 
-- Eduardo [@seuGitHub]
-- [Nome do colega 2] [@github2]
-- [Nome do colega 3] [@github3]
+- Eduardo Felipe Vicente [GitHub](https://github.com/EduardoFelipeVicente)
 
 ---
 
@@ -27,11 +25,11 @@ Essa jornada foi escolhida por representar o núcleo funcional do aplicativo e p
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Flutter** — Interface mobile multiplataforma
-- **Firebase** — Autenticação, banco de dados e integração com Google Calendar
-- **Google Calendar API** — Sincronização de sessões
-- **fl_chart** — Gráficos visuais de progresso
-- **Dart** — Lógica de programação
+- **Flutter** — Interface mobile multiplataforma  
+- **Firebase** — Autenticação, banco de dados e integração com Google Calendar  
+- **Google Calendar API** — Sincronização de sessões  
+- **fl_chart** — Gráficos visuais de progresso  
+- **Dart** — Lógica de programação  
 
 ---
 
@@ -39,16 +37,20 @@ Essa jornada foi escolhida por representar o núcleo funcional do aplicativo e p
 
 ### Pré-requisitos
 
-- Flutter SDK instalado
-- Conta no Firebase com projeto configurado
-- Arquivo `google-services.json` na pasta `android/app`
+- Flutter SDK instalado  
+- Conta no Firebase com projeto configurado  
+- Arquivo `google-services.json` na pasta `android/app`  
 
 ### Passos
 
-```bash
-git clone https://github.com/seuusuario/studiumflow.git
+```bash```
+
+git clone https://github.com/EduardoFelipeVicente/studiumFlow
+
 cd studiumflow
+
 flutter pub get
+
 flutter run
 
 ## 📊 Funcionalidades
@@ -71,5 +73,4 @@ flutter run
 ## 📌 Observações
 
 - O nome original do projeto era **StudyFlow**, mas foi alterado para **StudiumFlow** por questões de registro.
-- O ícone e nome do executável foram atualizados para refletir a nova identidade visual.
 - O projeto está hospedado no GitHub com commits contínuos desde o início do desenvolvimento.
