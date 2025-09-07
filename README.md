@@ -47,9 +47,9 @@ Caso prefira instalar diretamente no dispositivo Android, há um arquivo `Studiu
 
 ### Pré-requisitos via código fonte
 
-- Flutter SDK instalado  
-- Conta no Firebase com projeto configurado  
-- Arquivo `google-services.json` na pasta `android/app`  
+- Visual Studio Code
+- Flutter SDK
+- Android Studio (Com dispositivo emulado ligado)
 
 ### Instalação via código-fonte
 
@@ -73,6 +73,80 @@ flutter run
 - Interface responsiva e intuitiva desenvolvida em Flutter
 
 ---
+
+## 🧭 Navegação e Telas do Aplicativo
+
+O aplicativo StudiumFlow é composto por diversas telas que ajudam o usuário a planejar, executar e acompanhar seus estudos de forma prática e visual. Abaixo está um resumo de cada uma:
+
+---
+
+### 🏠 Início (Dashboard)
+
+- Visão geral do progresso e atividades recentes
+- Gráfico de pizza com sessões agendadas, concluídas e atrasadas
+- Cards com tempo agendado, tempo realizado e tempo de foco
+- Lista das próximas sessões com título, data, horário, tipo e descrição
+- Intervalo de datas considerado: 7 dias antes e 7 dias depois
+
+---
+
+### 🗓️ Criar Agenda de Estudos
+
+- Permite agendar novas sessões de estudo
+- Campos para título, dia da semana, horário de início e fim e descrição
+- Ideal para montar uma rotina personalizada
+- Consistência  de conflitos com outros compromissos
+
+---
+
+### 📌 Próximas Sessões
+
+- Lista de eventos, com filtros por período, tipo e status
+- Exibe detalhes como título, data, horário, tipo e status
+- Exibição e agrupamento por data, tipo ou status
+- Ajuda o usuário a se preparar com antecedência
+
+---
+
+### 📅 Calendário
+
+- Visualização mensal, semanal ou diária das sessões de estudo
+- Cores indicam o status de cada evento (agendada, concluída, atrasada, cancelado)
+- Permite navegar por datas e entender a distribuição das sessões
+- Permite a conclusão, alteração ou inclusão de eventos
+
+---
+
+### ▶️ Iniciar Sessão
+
+- Inicia uma sessão de estudo em tempo real
+- Cronômetro para foco e pausa, utilizando método pomodoro
+- Avisa quando iniciar ou terminar uma pausa
+- Registra automaticamente o tempo dedicado
+
+---
+
+### 📈 Progresso
+
+- Estatísticas detalhadas do desempenho do usuário por período
+- Informações de tempo de foco, pausa, agendado e realizado
+- Histórico de eventos por tipo e status
+- Comparativo entre tempo agendado e tempo realizado
+
+---
+
+### ⚙️ Configurações
+
+- IInformações da conta logada
+- Possibilidade de logout
+
+---
+
+### 🚪 Sair
+
+- Encerra a sessão atual do usuário
+- Protege os dados e permite login com outra conta
+
 
 ## 🎥 Vídeo de Apresentação
 
