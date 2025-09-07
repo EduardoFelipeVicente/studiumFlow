@@ -28,6 +28,8 @@ dependencies:
   collection: ^1.17.0
   intl: ^0.20.2
   audioplayers: ^6.5.1
+  fl_chart: ^0.68.0
+
 
 
 

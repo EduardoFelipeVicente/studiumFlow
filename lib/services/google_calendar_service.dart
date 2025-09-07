@@ -136,8 +136,8 @@ class GoogleCalendarService {
   /// e gravando propriedades extras como horários e durações de foco/pausa.
   Future<void> alterEventOnCalendar({
     required String eventId,
-    required DateTime start,
-    required DateTime end,
+    DateTime? start,
+    DateTime? end,
     String? novoTitulo,
     String? novaDescricao,
     int? typeSectionIndex,
@@ -165,14 +165,24 @@ class GoogleCalendarService {
     updated.visibility = visibility;
 
     // 2.2) datas de início e fim (sempre em UTC)
-    updated.start = calendar.EventDateTime(
-      dateTime: start.toUtc(),
-      timeZone: original.start?.timeZone ?? 'UTC',
-    );
-    updated.end = calendar.EventDateTime(
-      dateTime: end.toUtc(),
-      timeZone: original.end?.timeZone ?? 'UTC',
-    );
+    if (start != null) {
+      updated.start = calendar.EventDateTime(
+        dateTime: start.toUtc(),
+        timeZone: original.start?.timeZone ?? 'UTC',
+      );
+    } else {
+      // mantém o original
+      updated.start = original.start;
+    }
+
+    if (end != null) {
+      updated.end = calendar.EventDateTime(
+        dateTime: end.toUtc(),
+        timeZone: original.end?.timeZone ?? 'UTC',
+      );
+    } else {
+      updated.end = original.end;
+    }
 
     // 2.3) lembretes
     updated.reminders = calendar.EventReminders(
@@ -202,7 +212,7 @@ class GoogleCalendarService {
     }
 
     // tempos de foco, pausa e total
-    String _fmtDur(Duration d) {
+    String fmtDur(Duration d) {
       final h = d.inHours.toString().padLeft(2, '0');
       final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
       final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -210,14 +220,14 @@ class GoogleCalendarService {
     }
 
     if (focusDuration != null) {
-      props['focusTime'] = _fmtDur(focusDuration);
+      props['focusTime'] = fmtDur(focusDuration);
     }
     if (pauseDuration != null) {
-      props['pauseTime'] = _fmtDur(pauseDuration);
+      props['pauseTime'] = fmtDur(pauseDuration);
     }
     if (focusDuration != null && pauseDuration != null) {
       final total = focusDuration + pauseDuration;
-      props['totalTime'] = _fmtDur(total);
+      props['totalTime'] = fmtDur(total);
     }
 
     updated.extendedProperties = calendar.EventExtendedProperties(
@@ -247,20 +257,55 @@ class GoogleCalendarService {
     return resp.items ?? [];
   }
 
-    Future<List<calendar.Event>> fetchStudySessions({
+  Future<List<calendar.Event>> fetchStudySessions({
     required DateTime timeMin,
     required DateTime timeMax,
-    List<String>? privateExtendedProperties,
   }) async {
     final resp = await api.events.list(
       'primary',
       timeMin: timeMin,
       timeMax: timeMax,
-      privateExtendedProperty: privateExtendedProperties,
       singleEvents: true,
       orderBy: 'startTime',
     );
     return resp.items ?? <calendar.Event>[];
   }
 
+  Future<void> updateLateEvents() async {
+    final now = DateTime.now().toUtc();
+    print(
+      '[updateLateEvents] Iniciando verificação de eventos atrasados em $now',
+    );
+
+    // Busca eventos que terminaram até agora
+    final events = await fetchStudySessions(
+      timeMin: DateTime.utc(2000), // busca ampla
+      timeMax: now,
+    );
+
+    for (var ev in events) {
+      final id = ev.id;
+      final status = ev.extendedProperties?.private?['status'];
+      final tipo = ev.extendedProperties?.private?['type'];
+      final end = ev.end?.dateTime;
+
+      final isAtrasado =
+          end != null &&
+          end.isBefore(now) &&
+          status != statusSection[0] && // Nenhum
+          status != statusSection[2] && // Concluído
+          status != statusSection[4] && // Cancelado
+          tipo != typeSection[0]; // Tipo Nenhum
+      print('É atrasado? ${isAtrasado ? "SIM" : "NÃO"} ${ev.summary}');
+
+      if (isAtrasado && id != null) {
+        await alterEventOnCalendar(
+          eventId: id,
+          statusSectionIndex: 3 /* Atrasado */,
+        );
+      }
+
+      print('[updateLateEvents] Verificação concluída.');
+    }
+  }
 }

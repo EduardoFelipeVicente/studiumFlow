@@ -59,6 +59,15 @@ const Map<int, String> statusSection = {
   5: 'Outros',
 };
 
+final Map<String, Color> statusColorMap = {
+  'Agendado': const Color.fromARGB(255, 61, 104, 168),
+  'Concluido': const Color.fromARGB(255, 58, 138, 61),
+  'Cancelado': const Color.fromARGB(255, 117, 83, 50),
+  'Atrasado': const Color.fromARGB(255, 192, 80, 80),
+  'Outros' : const Color.fromARGB(255, 206, 92, 177),
+};
+
+
 const Map<int, String> styleViewNextEvents = {0: 'Dia', 1: 'Tipo', 2: 'Status'};
 
 // Pomodoro configuration (minutos e segundos)

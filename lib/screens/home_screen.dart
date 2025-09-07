@@ -1,8 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:studyflow/components/side_menu.dart';
+import 'package:studyflow/services/google_calendar_service.dart';
+import 'package:studyflow/services/auth_service.dart';
+import 'package:studyflow/services/google_auth_client.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _auth = AuthService();
+  late GoogleCalendarService _calendarService;
+
+  @override
+  void initState() {
+    super.initState();
+    print('initState');
+
+    _initAndUpdateLateEvents();
+  }
+
+  Future<void> _initAndUpdateLateEvents() async {
+    final headers = await _auth.getAuthHeaders();
+    final client = GoogleAuthClient(headers!);
+    _calendarService = GoogleCalendarService(client);
+    print('initAndUpdateLateEvents.');
+
+    await _calendarService.updateLateEvents();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -23,7 +23,8 @@ class StudySessionScreen extends StatefulWidget {
 }
 
 class _StudySessionScreenState extends State<StudySessionScreen> {
-  bool get _sessionActive => _sessionState == 'foco' || _sessionState == 'pausa';
+  bool get _sessionActive =>
+      _sessionState == 'foco' || _sessionState == 'pausa';
   final _authService = AuthService();
   late GoogleCalendarService _calendarService;
 
@@ -49,8 +50,6 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
   bool _alertedFocus = false;
   bool _alertedPause = false;
   Duration _currentPausePeriod = kShortPausePeriod;
-
-
 
   @override
   void initState() {
@@ -161,19 +160,29 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
     }
   }
 
-  void _finalizeSession() {
+  Future<void> _finalizeSession() async {
     _stopwatch.stop();
     setState(() => _sessionState = 'finalizado');
-    _calendarService.alterEventOnCalendar(
-      calendarId: 'primary',
-      eventId: _currentSession!.id!,
-      start: _sessionStart!, // horário real de início
-      end: DateTime.now(), // horário real de fim
-      statusSectionIndex: 2, // índice “Concluído”
-      focusDuration: _focusTime, // tempo de foco acumulado
-      pauseDuration: _pauseTime, // tempo de pausa
-      actualStart: _sessionStart, // grava o horário de início real
-    );
+
+    try {
+      await _calendarService.alterEventOnCalendar(
+        calendarId: 'primary',
+        eventId: _currentSession!.id!,
+        statusSectionIndex: 2, // Concluído
+        focusDuration: _focusTime,
+        pauseDuration: _pauseTime,
+        actualStart: _sessionStart,
+        // start e end ficam nulos e o serviço vai reaproveitar os originais
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sessão finalizada com sucesso!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao finalizar sessão: $e')));
+    }
   }
 
   void _notifyUser(String msg) {
