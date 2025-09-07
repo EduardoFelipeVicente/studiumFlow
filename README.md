@@ -137,7 +137,7 @@ O aplicativo StudiumFlow é composto por diversas telas que ajudam o usuário a 
 
 ### ⚙️ Configurações
 
-- IInformações da conta logada
+- Informações da conta logada
 - Possibilidade de logout
 
 ---
