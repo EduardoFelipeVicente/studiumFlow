@@ -150,7 +150,7 @@ O aplicativo StudiumFlow é composto por diversas telas que ajudam o usuário a 
 
 ## 🎥 Vídeo de Apresentação
 
-👉 [Assista aqui](https://youtube.com/seuvideo) — demonstração da jornada implementada e principais funcionalidades.
+👉 [Assista aqui](https://youtube.com/shorts/W0izWC2wc_E) — demonstração da jornada implementada e principais funcionalidades.
 
 ---
 
