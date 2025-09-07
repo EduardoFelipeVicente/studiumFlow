@@ -71,14 +71,14 @@ final Map<String, Color> statusColorMap = {
 const Map<int, String> styleViewNextEvents = {0: 'Dia', 1: 'Tipo', 2: 'Status'};
 
 // Pomodoro configuration (minutos e segundos)
-const int kFocusMinutes = 0;
-const int kFocusSeconds = 20;
+const int kFocusMinutes = 25;
+const int kFocusSeconds = 0;
 
-const int kShortPauseMinutes = 0;
-const int kShortPauseSeconds = 5;
+const int kShortPauseMinutes = 5;
+const int kShortPauseSeconds = 0;
 
-const int kLongPauseMinutes = 0;
-const int kLongPauseSeconds = 10;
+const int kLongPauseMinutes = 15;
+const int kLongPauseSeconds = 0;
 
 // Durations construídas a partir dos valores acima
 final Duration kFocusPeriod = Duration(
