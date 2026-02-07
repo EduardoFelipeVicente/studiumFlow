@@ -38,9 +38,10 @@ Essa jornada foi escolhida por representar o núcleo funcional do aplicativo e p
 
 ### Instalação via APK
 
-Caso prefira instalar diretamente no dispositivo Android, há um arquivo `StudiumFlow.apk` disponível para instalação manual, na raiz do projeto.
+Caso prefira instalar diretamente no dispositivo Android, há um arquivo `StudiumFlow.zip` disponível para instalação manual, na raiz do projeto.
 
 > ⚠️ Para isso, é necessário:
+- Descompactar a pasta com o APK
 - Permitir a instalação de apps de fontes desconhecidas nas configurações do Android
 - Ao abrir o app pela primeira vez, conceder permissão para usar sua conta Google
 - Autorizar o acesso à agenda para sincronização com o Google Calendar
