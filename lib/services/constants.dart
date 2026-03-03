@@ -3,11 +3,11 @@
 import 'package:flutter/material.dart';
 
 /// Texto padrão usado quando nenhum título for informado
-const String defaultStudySessionTitle = '[Study Flow] Sessão de Estudo';
+const String defaultStudySessionTitle = '[StudiumFlow] Sessão de Estudo';
 
 /// Descrição padrão usada quando nenhuma descrição for informada
 const String defaultStudySessionDes =
-    'Sessão gerada automaticamente pelo StudyFlow';
+    'Sessão gerada automaticamente pelo StudiumFlow';
 
 /// Mapeamento de colorId → cor real (usando ARGB)
 const Map<String, Color> eventColorMap = {

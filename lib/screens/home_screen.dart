@@ -1,3 +1,7 @@
+// lib/screens/home_screen.dart
+// HomeScreen: Tela principal do app, mostrando o dashboard de estudos.
+// Inclui gráfico de pizza, cards de tempo e lista de próximas sessões.
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -130,7 +134,16 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       drawer: const SideMenu(),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Colors.deepPurple),
+                  SizedBox(height: 12),
+                  Text('Carregando dados...'),
+                ],
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -226,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
+
 
                   ..._proximas.map(
                     (s) => Card(
