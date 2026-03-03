@@ -109,7 +109,7 @@ class GoogleCalendarService {
     final statusLabel = statusSection[statusSectionIndex] ?? statusSection[0]!;
 
     final ev = calendar.Event()
-      ..summary = titulo ?? '[StudyFlow] $sectionLabel'
+      ..summary = titulo ?? '[StudiumFlow] $sectionLabel'
       ..description = descricao ?? 'Sessão gerada automaticamente'
       ..start = calendar.EventDateTime(dateTime: start.toUtc(), timeZone: 'UTC')
       ..end = calendar.EventDateTime(

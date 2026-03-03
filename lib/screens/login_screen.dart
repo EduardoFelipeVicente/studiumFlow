@@ -91,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const SizedBox(height: 80),
                     const Text(
-                      'StudyFlow',
+                      'StudiumFlow',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 32,

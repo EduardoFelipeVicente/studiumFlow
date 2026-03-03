@@ -1,4 +1,6 @@
 // lib/components/side_menu.dart
+// SideMenu: Drawer lateral usado para navegação entre telas.
+// Inclui opções como Início, Agenda, Calendário, Progresso e Configurações.
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,7 +34,7 @@ class SideMenu extends StatelessWidget {
               backgroundColor: Colors.white,
               child: Text(
                 user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
-                style: const TextStyle(fontSize: 24, color: Colors.deepPurple),
+                style: const TextStyle(fontSize: 24, color: Colors.white),
               ),
             ),
             decoration: const BoxDecoration(color: Colors.deepPurple),
@@ -63,7 +65,7 @@ class SideMenu extends StatelessWidget {
           _buildTile(
             context,
             icon: Icons.alarm,
-            label: 'Próximas Seções',
+            label: 'Próximas Sessões',
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
@@ -88,7 +90,7 @@ class SideMenu extends StatelessWidget {
           _buildTile(
             context,
             icon: Icons.play_circle_fill,
-            label: 'Iniciar Seção',
+            label: 'Iniciar Sessão',
             onTap: () {
               Navigator.pop(context);
               Navigator.push(

@@ -1,4 +1,9 @@
 // lib/screens/auth_gate.dart
+// AuthGate: responsável por decidir qual tela mostrar
+// dependendo do estado de autenticação do usuário.
+// - Mostra Login se não houver usuário
+// - Mostra WelcomeScreen se for primeiro login
+// - Mostra HomeScreen se já estiver autenticado
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,7 +27,9 @@ class AuthGate extends StatelessWidget {
         // 1) Enquanto carrega o estado de autenticação
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(
+              child: CircularProgressIndicator(color: Colors.deepPurple),
+            ),
           );
         }
 
@@ -38,12 +45,16 @@ class AuthGate extends StatelessWidget {
           builder: (context, userSnap) {
             if (userSnap.connectionState == ConnectionState.waiting) {
               return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+                body: Center(
+                  child: CircularProgressIndicator(color: Colors.deepPurple),
+                ),
               );
             }
             if (userSnap.hasError) {
               return const Scaffold(
-                body: Center(child: Text('Erro ao carregar dados do usuário')),
+                body: Center(
+                  child: Text('Não foi possível carregar os dados do usuário'),
+                ),
               );
             }
 
