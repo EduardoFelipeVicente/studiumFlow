@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "109345613312",
-    "project_id": "studyflow-fb54c",
-    "storage_bucket": "studyflow-fb54c.firebasestorage.app"
+    "project_number": "243247687759",
+    "project_id": "studiumflow-8ad63",
+    "storage_bucket": "studiumflow-8ad63.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:109345613312:android:a642a0f86b51f72719dae5",
+        "mobilesdk_app_id": "1:243247687759:android:e67150fe3f9144a782223a",
         "android_client_info": {
           "package_name": "com.example.Studiumflow"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "109345613312-80fvn4s8sk24f047ndnnqrcv7oitf8p3.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyACk58Sn3ycYWgXy31-vwUQGyyW22tL9IU"
+          "current_key": "AIzaSyBdJON6MU5Drorpg1TxyjFBUmryvx_wZPg"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "109345613312-80fvn4s8sk24f047ndnnqrcv7oitf8p3.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }
