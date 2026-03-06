@@ -43,18 +43,68 @@ Caso prefira instalar diretamente no dispositivo Android, há um arquivo `Studiu
 > ⚠️ Para isso, é necessário:
 - Descompactar a pasta com o APK
 - Permitir a instalação de apps de fontes desconhecidas nas configurações do Android
-- Ao abrir o app pela primeira vez, conceder permissão para usar sua conta Google
+- Ao abrir o app pela primeira vez, conceder permissão para usar seu e-mail Google
 - Autorizar o acesso à agenda para sincronização com o Google Calendar
 
-### Pré-requisitos via código fonte
+### Pré-requisitos via código-fonte
 
 - Visual Studio Code
 - Flutter SDK
 - Android Studio (Com dispositivo emulado ligado)
+- Conta e projeto configurado no Firebase
+- Node.js instalado (necessário para o Firebase CLI)
+
+### Configurando o Firebase
+
+```bash
+#Instala o Firebase-CLI
+npm install -g firebase-tools
+
+#Instala o Flutterfire CLI
+dart pub global activate flutterfire_cli
+```
+
+Siga estes três passos essenciais para preparar o backend do projeto.
+
+#### 1. Ativar Autenticação por E-mail
+
+Para que os usuários consigam logar no app, é necessário habilitar o "porteiro" do Firebase.
+
+Acesse o Console do Firebase e selecione o projeto studiumflow.
+
+No menu lateral, clique em Autenticação (Authentication) > aba Método de login (Sign-in method).
+
+Clique em Adicionar novo provedor e selecione E-mail/senha.
+
+Ative a primeira chave (E-mail/senha) e clique em Salvar.
+
+#### 2. Cadastrar Usuário de Teste
+
+Agora, vamos criar manualmente a sua conta de acesso para os primeiros testes.
+
+Ainda em Autenticação, mude para a aba Users (Usuários).
+
+Clique no botão Adicionar usuário.
+
+Insira o seu e-mail e defina uma senha de sua preferência.
+
+Confirme em Adicionar usuário.
+
+#### 3. Inicializar o Banco de Dados (Firestore)
+
+É aqui que os dados do seu app (tarefas, horários, etc.) ficarão salvos.
+
+No menu lateral (seção Criação ou Build), clique em Firestore Database.
+
+Clique no botão central Criar banco de dados.
+
+Importante: Selecione a opção "Iniciar no modo de teste". Isso permite que você leia e escreva dados imediatamente sem configurar regras complexas agora.
+
+Siga as etapas de localização (pode manter o padrão) e clique em Ativar/Concluir.
 
 ### Instalação via código-fonte
 
-```bash```
+```bash
 
 git clone https://github.com/EduardoFelipeVicente/studiumFlow
 
@@ -62,7 +112,12 @@ cd studiumflow
 
 flutter pub get
 
-flutter run
+flutter run(Para rodar o projeto localmente) 
+
+ou 
+
+flutter build apk --release (Para compilar em apk)
+```
 
 ## 📊 Funcionalidades
 
@@ -96,7 +151,7 @@ O aplicativo StudiumFlow é composto por diversas telas que ajudam o usuário a 
 - Permite agendar novas sessões de estudo
 - Campos para título, dia da semana, horário de início e fim e descrição
 - Ideal para montar uma rotina personalizada
-- Consistência  de conflitos com outros compromissos
+- Consistência de conflitos com outros compromissos
 
 ---
 
