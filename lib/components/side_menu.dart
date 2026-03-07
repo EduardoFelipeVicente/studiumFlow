@@ -21,30 +21,36 @@ class SideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
     final textColor = disabled ? Colors.grey : null;
 
     return Drawer(
       child: Column(
         children: [
-          UserAccountsDrawerHeader(
-            accountName: Text(user?.displayName ?? 'Usuário'),
-            accountEmail: Text(user?.email ?? ''),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
-                style: const TextStyle(fontSize: 24, color: Colors.white),
-              ),
-            ),
-            decoration: const BoxDecoration(color: Colors.deepPurple),
+          // Cabeçalho com dados do usuário
+          StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+              return UserAccountsDrawerHeader(
+                accountName: Text(user?.displayName ?? 'Usuário'),
+                accountEmail: Text(user?.email ?? ''),
+                currentAccountPicture: CircleAvatar(
+                  backgroundColor: Colors.deepPurple,
+                  child: Text(
+                    user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
+                    style: const TextStyle(fontSize: 24, color: Colors.white),
+                  ),
+                ),
+                decoration: const BoxDecoration(color: Colors.deepPurple),
+              );
+            },
           ),
 
           _buildTile(
             context,
             icon: Icons.home,
             label: 'Início',
-            onTap: () => Navigator.push(
+            onTap: () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const HomeScreen()),
             ),
@@ -55,7 +61,7 @@ class SideMenu extends StatelessWidget {
             context,
             icon: Icons.dashboard_customize_rounded,
             label: 'Criar Agenda de Estudos',
-            onTap: () => Navigator.push(
+            onTap: () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const StudyScheduleScreen()),
             ),
@@ -68,7 +74,7 @@ class SideMenu extends StatelessWidget {
             label: 'Próximas Sessões',
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const NextEventsScreen()),
               );
@@ -80,7 +86,7 @@ class SideMenu extends StatelessWidget {
             context,
             icon: Icons.calendar_month,
             label: 'Calendário',
-            onTap: () => Navigator.push(
+            onTap: () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const CalendarScreen()),
             ),
@@ -93,7 +99,7 @@ class SideMenu extends StatelessWidget {
             label: 'Iniciar Sessão',
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const StudySessionScreen()),
               );
@@ -107,7 +113,7 @@ class SideMenu extends StatelessWidget {
             label: 'Progresso',
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const ProgressScreen()),
               );
@@ -119,7 +125,7 @@ class SideMenu extends StatelessWidget {
             context,
             icon: Icons.settings,
             label: 'Configurações',
-            onTap: () => Navigator.push(
+            onTap: () => Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
@@ -133,8 +139,14 @@ class SideMenu extends StatelessWidget {
             icon: Icons.logout,
             label: 'Sair',
             onTap: () async {
-              await AuthService().logout();
-              Navigator.of(context).pushNamedAndRemoveUntil('/', (r) => false);
+              try {
+                await AuthService().logout();
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (r) => false);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erro ao sair: $e')),
+                );
+              }
             },
             textColor: textColor,
           ),
@@ -144,12 +156,12 @@ class SideMenu extends StatelessWidget {
   }
 
   Widget _buildTile(
-    BuildContext ctx, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color? textColor,
-  }) {
+      BuildContext ctx, {
+        required IconData icon,
+        required String label,
+        required VoidCallback onTap,
+        Color? textColor,
+      }) {
     return ListTile(
       leading: Icon(icon, color: textColor),
       title: Text(label, style: TextStyle(color: textColor)),

@@ -404,14 +404,14 @@ class _NextEventsScreenState extends State<NextEventsScreen> {
                                   '${dateFmt.format(e.start!.dateTime!.toLocal())} '
                                   '${timeFmt.format(e.start!.dateTime!.toLocal())} até '
                                   '${timeFmt.format(e.end!.dateTime!.toLocal())}',
-                                  style: const TextStyle(color: Colors.black),
+                                  style: Theme.of(context).textTheme.bodyMedium,
                                 ),
 
                               // Tipo / Status
                               Text(
                                 'Tipo: ${e.extendedProperties?.private?['type'] ?? 'Sem Tipo'}    '
                                 'Status: ${e.extendedProperties?.private?['status'] ?? 'Sem Status'}',
-                                style: const TextStyle(color: Colors.black),
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
 
                               // Descrição

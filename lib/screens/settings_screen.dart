@@ -1,6 +1,10 @@
+// lib/screens/settings_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../services/theme_provider.dart';
 import '../components/side_menu.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -9,6 +13,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -19,7 +24,7 @@ class SettingsScreen extends StatelessWidget {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
-      drawer: const SideMenu(), // ✅ Adicionado menu lateral
+      drawer: const SideMenu(),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -36,6 +41,38 @@ class SettingsScreen extends StatelessWidget {
               subtitle: Text(user?.email ?? 'Email não disponível'),
             ),
             const Divider(height: 32),
+
+            const Text(
+              'Tema',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ Dropdown para escolher Claro / Escuro / Sistema
+            DropdownButton<ThemeMode>(
+              value: themeProvider.themeMode,
+              items: const [
+                DropdownMenuItem(
+                  value: ThemeMode.light,
+                  child: Text('Claro'),
+                ),
+                DropdownMenuItem(
+                  value: ThemeMode.dark,
+                  child: Text('Escuro'),
+                ),
+                DropdownMenuItem(
+                  value: ThemeMode.system,
+                  child: Text('Sistema'),
+                ),
+              ],
+              onChanged: (mode) {
+                if (mode != null) {
+                  themeProvider.setTheme(mode);
+                }
+              },
+            ),
+
+            const Divider(height: 32),
             const Text(
               'Ações',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -44,9 +81,7 @@ class SettingsScreen extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: () async {
                 await AuthService().logout();
-                Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil('/', (route) => false);
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
               },
               icon: const Icon(Icons.logout),
               label: const Text('Sair da conta'),

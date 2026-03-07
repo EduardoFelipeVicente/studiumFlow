@@ -2,7 +2,8 @@
 
 import 'package:http/http.dart' as http;
 
-/// Injetor automático do Authorization em cada request
+/// Cliente HTTP que injeta automaticamente os headers de autorização
+/// em cada requisição feita para a API do Google.
 class GoogleAuthClient extends http.BaseClient {
   final Map<String, String> _headers;
   final http.Client _inner = http.Client();
@@ -11,6 +12,7 @@ class GoogleAuthClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) {
+    // Adiciona os headers de autenticação (ex: Authorization: Bearer <token>)
     request.headers.addAll(_headers);
     return _inner.send(request);
   }

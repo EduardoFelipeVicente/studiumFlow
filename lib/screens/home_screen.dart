@@ -42,12 +42,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> initAndUpdateLateEvents() async {
-    final headers = await _auth.getAuthHeaders();
-    final client = GoogleAuthClient(headers!);
-    _calendarService = GoogleCalendarService(client);
+    try {
+      final headers = await _auth.getAuthHeaders();
+      if (headers == null) return;
 
-    await _calendarService.updateLateEvents();
-    await _loadDashboardData();
+      final client = GoogleAuthClient(headers);
+      _calendarService = GoogleCalendarService(client);
+
+      await _calendarService.updateLateEvents();
+      await _loadDashboardData();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao carregar dados: $e')),
+      );
+    }
   }
 
   Future<void> _loadDashboardData() async {
@@ -100,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (pt != null) _pauseSecs += _parseHms(pt);
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -124,152 +135,155 @@ class _HomeScreenState extends State<HomeScreen> {
     final intervalo = '${_dateFmt.format(start)} até ${_dateFmt.format(end)}';
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        centerTitle: true,
-        title: const Text(
-          'StudiumFlow',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        appBar: AppBar(
+          backgroundColor: Colors.deepPurple,
+          centerTitle: true,
+          title: const Text(
+            'StudiumFlow',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
         ),
-      ),
-      drawer: const SideMenu(),
-      body: _isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.deepPurple),
-                  SizedBox(height: 12),
-                  Text('Carregando dados...'),
-                ],
+        drawer: const SideMenu(),
+        body: _isLoading
+            ? const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Colors.deepPurple),
+              SizedBox(height: 12),
+              Text('Carregando dados...'),
+            ],
+          ),
+        )
+            : SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              const Text(
+              'Dashboard de Estudos',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'Intervalo considerado: $intervalo',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+
+            // Gráfico de pizza
+            SizedBox(
+              height: 180,
+              child: PieChart(
+                PieChartData(
+                  centerSpaceRadius: 30,
+                  sectionsSpace: 4,
+                  sections: [
+                    if (_agendadas > 0)
+                      PieChartSectionData(
+                        value: _agendadas.toDouble(),
+                        color: statusColorMap['Agendado'],
+                        radius: 50,
+                        title:
+                        '${(_agendadas / total * 100).toStringAsFixed(0)}%',
+                        titleStyle: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    if (_concluidas > 0)
+                      PieChartSectionData(
+                        value: _concluidas.toDouble(),
+                        color: statusColorMap['Concluído'],
+                        radius: 50,
+                        title:
+                        '${(_concluidas / total * 100).toStringAsFixed(0)}%',
+                        titleStyle: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    if (_atrasadas > 0)
+                      PieChartSectionData(
+                        value: _atrasadas.toDouble(),
+                        color: statusColorMap['Atrasado'],
+                        radius: 50,
+                        title:
+                        '${(_atrasadas / total * 100).toStringAsFixed(0)}%',
+                        titleStyle: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Dashboard de Estudos',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Intervalo considerado: $intervalo',
-                    style: const TextStyle(fontSize: 14),
-                  ),
+            ),
+            const SizedBox(height: 16),
 
-                  const SizedBox(height: 24),
+            // Cards de tempo
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildInfoCard(
+                  label: 'Agendado',
+                  value: _formatHms(_scheduledSecs),
+                  color: Colors.blue,
+                ),
+                _buildInfoCard(
+                  label: 'Realizado',
+                  value: _formatHms(_focusSecs + _pauseSecs),
+                  color: Colors.green,
+                ),
+                _buildInfoCard(
+                  label: 'Foco',
+                  value: _formatHms(_focusSecs),
+                  color: Colors.deepPurple,
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
 
-                  // Gráfico de pizza
-                  SizedBox(
-                    height: 180,
-                    child: PieChart(
-                      PieChartData(
-                        centerSpaceRadius: 30,
-                        sectionsSpace: 4,
-                        sections: [
-                          if (_agendadas > 0)
-                            PieChartSectionData(
-                              value: _agendadas.toDouble(),
-                              color: statusColorMap['Agendado'],
-                              radius: 50,
-                              title:
-                                  '${(_agendadas / total * 100).toStringAsFixed(0)}%',
-                              titleStyle: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                          if (_concluidas > 0)
-                            PieChartSectionData(
-                              value: _concluidas.toDouble(),
-                              color: statusColorMap['Concluído'],
-                              radius: 50,
-                              title:
-                                  '${(_concluidas / total * 100).toStringAsFixed(0)}%',
-                              titleStyle: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                          if (_atrasadas > 0)
-                            PieChartSectionData(
-                              value: _atrasadas.toDouble(),
-                              color: statusColorMap['Atrasado'],
-                              radius: 50,
-                              title:
-                                  '${(_atrasadas / total * 100).toStringAsFixed(0)}%',
-                              titleStyle: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+            const Text(
+              'Próximas Sessões',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
 
-                  // Cards de tempo
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildInfoCard(
-                        label: 'Agendado',
-                        value: _formatHms(_scheduledSecs),
-                        color: Colors.blue,
-                      ),
-                      _buildInfoCard(
-                        label: 'Realizado',
-                        value: _formatHms(_focusSecs + _pauseSecs),
-                        color: Colors.green,
-                      ),
-                      _buildInfoCard(
-                        label: 'Foco',
-                        value: _formatHms(_focusSecs),
-                        color: Colors.deepPurple,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  const Text(
-                    'Próximas Sessões',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-
-
-                  ..._proximas.map(
-                    (s) => Card(
+            ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _proximas.length,
+                itemBuilder: (context, index) {
+                  final s = _proximas[index];
+                  return Card(
                       elevation: 2,
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              s['title']!,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(
+                          s['title']!,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(height: 4),
-                            Text('🗓 ${s['date']}'),
-                            Text('⏰ ${s['start']} - ${s['end']}'),
-                            Text('📌 Tipo: ${s['type']}'),
-                            if (s['desc']!.isNotEmpty) Text('📝 ${s['desc']}'),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('🗓 ${s['date']}'),
+                              Text('⏰ ${s['start']} - ${s['end']}'),
+                              Text('📌 Tipo: ${s['type']}'),
+                              if (s['desc']!.isNotEmpty) Text('📝 ${s['desc']}'),
+                            ],
+                          ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
+                  );
+                },
             ),
+              ],
+            ),
+        ),
     );
   }
 

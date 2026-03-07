@@ -16,9 +16,7 @@ class AuthService {
     serverClientId: _webClientId,
     scopes: [
       'email',
-      calendar
-          .CalendarApi
-          .calendarScope, // https://www.googleapis.com/auth/calendar
+      calendar.CalendarApi.calendarScope, // https://www.googleapis.com/auth/calendar
     ],
   );
 
@@ -58,10 +56,9 @@ class AuthService {
 
   /// Cria ou atualiza documento do usuário no Firestore
   Future<void> criarOuAtualizarUsuario(User user) async {
-    final docRef = FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(user.uid);
+    final docRef = FirebaseFirestore.instance.collection('usuarios').doc(user.uid);
     final doc = await docRef.get();
+
     if (!doc.exists) {
       await docRef.set({
         'nome': user.displayName,
@@ -77,9 +74,7 @@ class AuthService {
   /// Retorna true se for o primeiro login (e já atualiza as flags no Firestore)
   Future<bool> isPrimeiroLogin(User user) async {
     try {
-      final docRef = FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(user.uid);
+      final docRef = FirebaseFirestore.instance.collection('usuarios').doc(user.uid);
       final snapshot = await docRef.get();
       final dados = snapshot.data();
       if (dados == null) return false;
@@ -101,20 +96,29 @@ class AuthService {
 
   /// Logout de Firebase e Google
   Future<void> logout() async {
-    await _googleSignIn.signOut();
-    await _auth.signOut();
+    try {
+      await _googleSignIn.signOut();
+      await _auth.signOut();
+    } catch (e) {
+      print('Erro ao fazer logout: $e');
+    }
   }
 
   /// Retorna os headers de Authorization para chamadas REST (ou null se não autenticou)
   Future<Map<String, String>?> getAuthHeaders() async {
-    GoogleSignInAccount? user = await _googleSignIn.signInSilently();
-    user ??= await _googleSignIn.signIn();
-    if (user == null) return null;
+    try {
+      GoogleSignInAccount? user = await _googleSignIn.signInSilently();
+      user ??= await _googleSignIn.signIn();
+      if (user == null) return null;
 
-    final auth = await user.authentication;
-    return {
-      'Authorization': 'Bearer ${auth.accessToken}',
-      'Content-Type': 'application/json',
-    };
+      final auth = await user.authentication;
+      return {
+        'Authorization': 'Bearer ${auth.accessToken}',
+        'Content-Type': 'application/json',
+      };
+    } catch (e) {
+      print('Erro ao obter headers de autenticação: $e');
+      return null;
+    }
   }
 }
