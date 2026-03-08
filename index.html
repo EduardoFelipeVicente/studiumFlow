@@ -56,6 +56,9 @@
       <div class="nav-container">
         <nav class="main-nav">
           <a href="#integrantes">Integrantes</a>
+          <a href="#firebase">FireBase</a>
+          <a href="#frontend">FrontEnd</a>
+          <a href="#backend">BackEnd</a>
           <a href="#jornadas-tecnologias">Jornadas e Tecnologias</a>
           <a href="#tutorial">Tutorial</a>
           <a href="#funcionalidades">Funcionalidades</a>
@@ -71,18 +74,87 @@
         <div class="card-grid">
           <article class="card">
             <ul class="list">
-              <li>Eduardo Felipe Vicente</li>
-              <li>Rodrigo Amaral</li>
-              <li>Pedro H B Silva</li>
-              <li>Thiago Andrade</li>
-              <li>Lucas Moré Pereira</li>
+              <li>Eduardo Felipe Vicente - <a href="https://github.com/EduardoFelipeVicente" class="hero-title-link">GitHub</a></li>
+              <li>Rodrigo Amaral - <a href="https://github.com/Rodrigo-Amaral1" class="hero-title-link">GitHub</a></li>
+              <li>Pedro Henrique Borges da Silva - <a href="https://github.com/Azgro" class="hero-title-link">GitHub</a></li>
+              <li>Thiago Andrade - <a href="https://github.com/HeedADR" class="hero-title-link">GitHub</a></li>
+              <li>Lucas Moré Pereira - <a href="https://github.com/lucasmorep" class="hero-title-link">GitHub</a></li>
             </ul>
           </article>
         </div>
       </section>
 
-      <section id="jornadas-tecnologias" class="section-card">
-        <h2 class="section-title">🎯 Jornadas e Tecnologias</h2>
+        <section id="firebase" class="section-card">
+            <h2 class="section-title">🔥 Firebase</h2>
+            <div class="card-grid two-columns">
+                <article class="card">
+                    <p class="card-text">
+                        O <strong>Firebase</strong> é utilizado como plataforma principal de persistência e autenticação.
+                        Em vez de tabelas relacionais, os dados são armazenados em <strong>coleções e documentos</strong>
+                        dentro do Firestore, permitindo flexibilidade e escalabilidade.
+                    </p>
+                    <ul class="list">
+                        <li>Armazenamento de usuários com informações de login</li>
+                        <li>Registro de sessões de estudo com tipo, status e horários</li>
+                        <li>Integração com o Google Calendar para sincronização de eventos</li>
+                        <li>Autenticação segura via Firebase Auth (Google e email/senha)</li>
+                    </ul>
+                    <p class="card-text">
+                        Essa abordagem garante que os dados fiquem centralizados na nuvem, com sincronização em tempo real
+                        e suporte nativo a múltiplas plataformas.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section id="backend" class="section-card">
+            <h2 class="section-title">⚙️ Backend</h2>
+            <div class="card-grid two-columns">
+                <article class="card">
+                    <p class="card-text">
+                        O <strong>backend</strong> é construído sobre serviços <strong>serverless</strong> do Firebase e
+                        integrações externas. Ele fornece autenticação, persistência e lógica de negócio sem necessidade
+                        de servidores dedicados.
+                    </p>
+                    <ul class="list">
+                        <li>Firebase Auth para autenticação e gerenciamento de usuários</li>
+                        <li>Firestore como banco de dados NoSQL</li>
+                        <li>Firebase Functions para lógica adicional (ex: notificações)</li>
+                        <li>Integração com a API do Google Calendar para eventos</li>
+                    </ul>
+                    <p class="card-text">
+                        Essa arquitetura simplifica a manutenção, reduz custos e garante escalabilidade automática,
+                        aproveitando toda a infraestrutura do Google Cloud.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section id="frontend" class="section-card">
+            <h2 class="section-title">💻 Frontend</h2>
+            <div class="card-grid two-columns">
+                <article class="card">
+                    <p class="card-text">
+                        O <strong>frontend</strong> é desenvolvido em <strong>Flutter</strong>, garantindo uma experiência
+                        consistente em múltiplas plataformas (Android, iOS, Web e Desktop).
+                    </p>
+                    <ul class="list">
+                        <li>Interface responsiva e moderna com Material Design</li>
+                        <li>Integração direta com Firebase para login e dados</li>
+                        <li>Dashboard com sessões, progresso e gráficos</li>
+                        <li>Configurações de tema (claro, escuro, sistema) e notificações</li>
+                    </ul>
+                    <p class="card-text">
+                        O Flutter permite que o mesmo código seja compilado para diferentes dispositivos,
+                        acelerando o desenvolvimento e garantindo uniformidade visual e funcional.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+
+      <section id="jornadas" class="section-card">
+        <h2 class="section-title">🎯 Jornadas</h2>
         <div class="card-grid two-columns">
           <article class="card">
             <p class="card-text">
@@ -97,17 +169,6 @@
             <p class="card-text">
               Essa jornada foi escolhida por representar o núcleo funcional do aplicativo e permitir validar a integração entre interface, lógica de negócio e persistência de dados.
             </p>
-          </article>
-
-          <article class="card">
-            <h3 class="card-title">Tecnologias Utilizadas</h3>
-            <ul class="list">
-              <li>Flutter</li>
-              <li>Firebase</li>
-              <li>Google Calendar API</li>
-              <li>fl_chart</li>
-              <li>Dart</li>
-            </ul>
           </article>
         </div>
       </section>
@@ -285,6 +346,7 @@
             <h3 class="card-title">Configurações</h3>
             <ul class="list">
               <li>Informações da conta logada</li>
+              <li>Escolha modo visual: escuro, claro ou sistema</li>
               <li>Possibilidade de logout</li>
             </ul>
           </article>
