@@ -1,0 +1,270 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.6;
+    color: #1f2933;
+    background-color: #f9fafb;
+  }
+  
+  :root {
+    --purple: #5b21cc;
+    --purple-soft: #7c3aed;
+    --border-soft: #e5e7eb;
+  }
+  
+  .hero-layout {
+    background: linear-gradient(90deg, var(--purple-soft), var(--purple));
+    color: #ffffff;
+  }
+  
+  .hero-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 2rem;
+  }
+  
+  .hero-copy {
+    color: #f9fafb;
+  }
+  
+  .hero-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .hero-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 1.5rem;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.4);
+  }
+  
+  .hero-title h1 {
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .hero-title-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  
+  .hero-title-link:hover {
+    text-decoration: underline;
+  }
+  
+  .hero-subtitle {
+    margin-top: 0.6rem;
+    font-size: 0.98rem;
+    max-width: 700px;
+    color: #fefce8;
+  }
+  
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: #ffffff;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  
+  .nav-container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0.7rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  
+  .main-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.2rem;
+  }
+  
+  .main-nav a {
+    font-size: 0.9rem;
+    color: #4b5563;
+    text-decoration: none;
+    padding-bottom: 0.1rem;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  
+  .main-nav a:hover {
+    color: var(--purple);
+    border-color: var(--purple);
+  }
+  
+  .page-shell {
+    padding: 2rem 1rem 3rem;
+  }
+  
+  .section-card {
+    max-width: 960px;
+    margin: 0 auto 1.75rem;
+    padding: 0 1.5rem;
+  }
+  
+  .section-title {
+    font-size: 1.4rem;
+    color: #111827;
+    margin-bottom: 0.9rem;
+  }
+  
+  .card-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  
+  .card-grid.two-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  
+  .card {
+    background-color: #ffffff;
+    border-radius: 0.8rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  }
+  
+  .card-title {
+    font-size: 1.05rem;
+    color: #111827;
+    margin-bottom: 0.6rem;
+  }
+  
+  .card-subtitle {
+    font-size: 0.96rem;
+    color: #111827;
+    margin: 0.9rem 0 0.35rem;
+  }
+  
+  .card-text {
+    font-size: 0.9rem;
+    color: #4b5563;
+    margin-bottom: 0.35rem;
+  }
+  
+  .list {
+    list-style: disc;
+    padding-left: 1.1rem;
+    margin: 0.35rem 0 0.35rem;
+  }
+  
+  .list li {
+    font-size: 0.9rem;
+    color: #4b5563;
+    margin-bottom: 0.25rem;
+  }
+  
+  .alert {
+    margin-top: 0.5rem;
+  }
+  
+  .alert-title {
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+  
+  .advice-list {
+    padding: 0.7rem 0.8rem;
+    border-radius: 0.75rem;
+    background: #fefce8;
+    border: 1px solid #facc15;
+  }
+  
+  .advice-list p,
+  .advice-list li {
+    color: #111827;
+  }
+  
+  .code-block {
+    margin: 0.7rem 0;
+    padding: 0.75rem 0.9rem;
+    background: #020617;
+    border-radius: 0.7rem;
+    border: 1px solid #1e293b;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    font-size: 0.85rem;
+    color: #e5e7eb;
+  }
+  
+  .code-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+  }
+  
+  .code-list li {
+    margin-bottom: 0.18rem;
+  }
+  
+  code {
+    font-family: inherit;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+  }  
+  
+  p a {
+    color: var(--purple);
+    text-decoration: underline;
+  }
+  
+  @media (max-width: 768px) {
+    .hero-inner {
+      padding: 2.2rem 1.25rem 1.6rem;
+    }
+  
+    .hero-title h1 {
+      font-size: 1.7rem;
+    }
+  
+    .hero-subtitle {
+      font-size: 0.9rem;
+    }
+  
+    .card-grid.two-columns {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  
+    .section-card {
+      padding: 0 1.25rem;
+    }
+  }
+
+  .video-wrapper {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%;
+    margin-top: 0.75rem;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+  }
+  
+  .video-wrapper iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
