@@ -214,6 +214,8 @@ O aplicativo StudiumFlow é composto por diversas telas que ajudam o usuário a 
 
 Abaixo está um vídeo de demonstração do aplicativo StudiumFlow:
 
+[Clique aqui para acessar o video](https://www.youtube.com/shorts/AjLPTTvwAYI)
+
 💡 Observações
 --------------
 
